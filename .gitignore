@@ -1,0 +1,8 @@
+/data
+/cache
+.idea
+*.pyc
+/.ipynb_checkpoints
+*.db
+/__pycache__
+*.json
