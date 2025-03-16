@@ -1,5 +1,5 @@
 import os
-import ujson as json  # Faster JSON parsing
+import ujson as json
 from tqdm import tqdm
 from config import *
 
@@ -30,7 +30,7 @@ def find_non_empty_nested_keys(obj, parent_key=""):
 
     return nested_keys
 
-if __name__ == '__main__':
+def make_post_subset():
     # Subset files paths
     os.makedirs('data/subset', exist_ok=True)
 
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     count = 0
     count_lines = 0
     with open(posts_2025_file, 'r', encoding='utf-8') as f:
-        for line in tqdm(f, desc=f'Reading lines... (Will write {LINES_SUBSET:,} lines in total)'):
+        for line in tqdm(f, desc=f'Reading lines... (Will write {LINES_SUBSET:,} lines in total)', total=int(LINES_SUBSET/0.2)):
             count += 1
             line_json = json.loads(line)  # Parse JSON
             nested_keys = find_non_empty_nested_keys(line_json)  # Find non-empty nested JSON
@@ -57,9 +57,11 @@ if __name__ == '__main__':
                 count_lines += 1
                 with open(posts_subset_file, 'a', encoding='utf-8') as f:
                     f.write(line)
-            if count % 100000 == 0:
+            if count % 50000 == 0:
                 print(f'Wrote {count_lines:,} lines...({count_lines/count*100:.1f}% | {count_lines/LINES_SUBSET*100:.1f}%)')
             if count_lines == LINES_SUBSET:
                 break
 
 
+if __name__ == '__main__':
+    make_post_subset()
