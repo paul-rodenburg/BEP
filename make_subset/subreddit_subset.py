@@ -99,4 +99,13 @@ def make_subset_subreddits():
 
 # Run the process
 if __name__ == "__main__":
+    # Update working directory
+    current_directory = os.getcwd()
+    parent_directory = os.path.dirname(current_directory)
+    os.chdir(parent_directory)
+
+    # Make folders
+    os.makedirs('cache', exist_ok=True)
+    os.makedirs('data/subset', exist_ok=True)
+
     make_subset_subreddits()

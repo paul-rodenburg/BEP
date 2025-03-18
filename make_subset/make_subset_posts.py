@@ -2,22 +2,28 @@ import os
 import ujson as json
 from tqdm import tqdm
 from config import *
-import sys
+from general import get_line_count_file
 
-def check_existing_file() -> bool:
+def check_existing_file() -> list:
     """
     Check if posts subset file exists and prompt the user.
 
-    :return: True if can continue
+    :return: a list of dates to skip
     """
-    if os.path.isfile(posts_subset_file):
-        user_continue = input(f'{posts_subset_file} already exists. Do you want to replace it? ([y]/n) ')
-        if user_continue.lower() == 'n':
-            return False
-        else:
-            os.remove(posts_subset_file)
-            return True
-    return True
+    subset_files = [f'{posts_subset_file}_{date}' for date in dates_subsets]
+
+    # Check if any file exists
+    existing_files = [file for file in subset_files if os.path.isfile(file)]
+    skip_dates = []
+
+    for existing_file in existing_files:
+        date_file = existing_file.split('_')[-1]
+        user_continue = input(f"The post file for date {date_file}. Do you want to replace them? ([y]/n) ").strip().lower()
+        if user_continue == 'n':
+            continue
+        skip_dates.append(date_file)
+
+    return skip_dates
 
 
 def find_non_empty_nested_keys(obj, parent_key=""):
@@ -46,38 +52,73 @@ def find_non_empty_nested_keys(obj, parent_key=""):
 
     return nested_keys
 
-
-def create_post_subset_file():
-    # Find lines with nested JSON objects
-    count = 0
+def init_count_lines(skip_dates) -> int:
+    if len(skip_dates) == 0:
+        return 0
+    files_to_count = [f'{posts_subset_file}_{i}' for i in dates_to_subset[skip_dates]]
     count_lines = 0
-    with open(posts_2025_file, 'r', encoding='utf-8') as f:
-        progress_bar = tqdm(f, desc=f'Processing posts (writing max {int(LINES_SUBSET/1_000_000)}M lines)', total=int(LINES_SUBSET/0.2))
-        for line in progress_bar:
-            count += 1
-            line_json = json.loads(line)  # Parse JSON
-            nested_keys = find_non_empty_nested_keys(line_json)  # Find non-empty nested JSON
+    for file in files_to_count:
+        count_lines += get_line_count_file(file)
+    return count_lines
 
-            if nested_keys:  # Only print if nested objects have length > 0
-                count_lines += 1
-                with open(posts_subset_file, 'a', encoding='utf-8') as f_out:
-                    f_out.write(f"{count}\n")
-            if count_lines % 3_000 == 0:  # Update only every 3,000 lines to maximize performance
-                progress_bar.set_postfix_str(f'Wrote {count_lines:,} lines...({count_lines/count*100:.1f}% | {count_lines/LINES_SUBSET*100:.1f}%)')
-            if count_lines == LINES_SUBSET:
-                break
-        print(f'Finished. Wrote {count_lines:,} lines...({count_lines / count * 100:.1f}% | {count_lines / LINES_SUBSET * 100:.1f}%)')
+
+def create_post_subset_file(skip_dates):
+    count_lines = init_count_lines(skip_dates)
+    print(f'count_lines init to {count_lines:,}')
+    progress_bar = tqdm(desc='Processing posts', total=LINES_SUBSET)
+
+    def process_file(file_path, date):
+        """Helper function to process a file and extract lines."""
+        nonlocal count_lines
+        count = 0
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                count += 1
+                line_json = json.loads(line)  # Parse JSON
+                nested_keys = find_non_empty_nested_keys(line_json)  # Find non-empty nested JSON
+
+                if nested_keys:  # Only process if nested objects exist
+                    count_lines += 1
+                    with open(f'{posts_subset_file}_{date}', 'a', encoding='utf-8') as f_out:
+                        f_out.write(f"{count}\n")
+
+                    progress_bar.update(1)
+
+                if count_lines == LINES_SUBSET:
+                    return  # Stop processing if limit is reached
+
+    dates_subsets_processed = [i for i in dates_subsets if i not in skip_dates]
+
+    for i in range(len(dates_subsets_processed)):
+        subset_file = dates_to_subset[dates_subsets_processed[i]]
+        process_file(subset_file, dates_subsets_processed[i])
+        if count_lines < LINES_SUBSET and i != len(dates_subsets_processed) - 1:
+            progress_bar.set_postfix_str(f'{dates_subsets_processed[i]} had not enough posts. Continuing with {dates_subsets_processed[i+1]}')
+        else:
+            print(f'{dates_subsets_processed[i]} had not enough posts (wanted: {LINES_SUBSET:,}; got: {count_lines:,}) ')
+            break
+
+    progress_bar.close()
+
+
 
 
 def make_post_subset():
     # Subset files paths
     os.makedirs('data/subset', exist_ok=True)
 
-    if check_existing_file():
-        create_post_subset_file()
-    else:
-        print('Skipping creating post subset...')
+    skip_dates = check_existing_file()
+    create_post_subset_file(skip_dates)
 
 
 if __name__ == '__main__':
+    # Update working directory
+    current_directory = os.getcwd()
+    parent_directory = os.path.dirname(current_directory)
+    os.chdir(parent_directory)
+
+    # Make folders
+    os.makedirs('cache', exist_ok=True)
+    os.makedirs('data/subset', exist_ok=True)
+
     make_post_subset()

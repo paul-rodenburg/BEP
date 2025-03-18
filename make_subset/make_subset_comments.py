@@ -79,17 +79,16 @@ def create_comment_subset(post_ids):
     count = 0
 
     with open(comments_file, 'r', encoding='utf-8') as f:
-        progress_bar = tqdm(f, desc=f'Processing comments (writing max {int(LINES_SUBSET/1_000_000)}M lines)', total=LINES_SUBSET / 0.1)  # Approximation
-        for line in progress_bar:
+        progress_bar = tqdm(desc=f'Processing comments', total=LINES_SUBSET)
+
+        for line in f:
             count += 1
             parent_id = find_parent_post(line)
             if parent_id and parent_id in post_ids:
                 with open(comments_subset_file, 'a', encoding='utf-8') as f_out:
                     f_out.write(f"{count}\n")
                 count_lines += 1
-
-            if count_lines % 3_000 == 0:  # Update only every 3,000 lines to maximize performance
-                progress_bar.set_postfix_str(f'Wrote {count_lines:,} lines... ({count_lines / count * 100:.1f}% | {count_lines / LINES_SUBSET * 100:.1f}%)')
+                progress_bar.update(1)
 
             if count_lines == LINES_SUBSET:
                 break
@@ -113,4 +112,13 @@ def make_subset_comments():
 
 # Run the process
 if __name__ == "__main__":
+    # Update working directory
+    current_directory = os.getcwd()
+    parent_directory = os.path.dirname(current_directory)
+    os.chdir(parent_directory)
+
+    # Make folders
+    os.makedirs('cache', exist_ok=True)
+    os.makedirs('data/subset', exist_ok=True)
+
     make_subset_comments()

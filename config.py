@@ -17,6 +17,9 @@ subreddit_rules_file = 'data/other/reddit/subreddits/subreddit_rules_2025-01/sub
 subreddit_wiki_file = 'data/other/reddit/subreddits/subreddit_wikis_2025-01/subreddit_wikis_2025-01'
 subreddits_file = 'data/other/reddit/subreddits/subreddits_2025-01/subreddits_2025-01'
 
+dates_subsets = ['2025-1', '2024-12']  # In order of priority
+dates_to_subset = {'2025-1': posts_2025_file,
+                   '2024-12': posts_2024_file}
 
 # SQL database
 subset_files_tables = {posts_subset_file: ['post', 'author', 'banned', 'removed'],
