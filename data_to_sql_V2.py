@@ -2,7 +2,8 @@ import os
 import pandas as pd
 import sqlite3
 from config import posts_subset_file, LINES_SUBSET, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file, posts_2025_file, subset_files_tables, subset_to_original
-from general import get_line_count_file, get_primary_key
+from general import get_primary_key
+from line_counts import get_line_count_file
 from data_to_sql import clean_line
 from tqdm import tqdm
 

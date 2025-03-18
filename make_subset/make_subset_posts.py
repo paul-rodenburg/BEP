@@ -2,7 +2,7 @@ import os
 import ujson as json
 from tqdm import tqdm
 from config import *
-from general import get_line_count_file
+from line_counts import get_line_count_file
 
 def check_existing_file() -> list:
     """

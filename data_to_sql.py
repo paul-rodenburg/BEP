@@ -6,7 +6,8 @@ import ujson as json
 import re
 from config import posts_subset_file, subset_files_tables, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file, LINES_SUBSET
 from tqdm import tqdm
-from general import get_line_count_file, get_primary_key
+from general import get_primary_key
+from line_counts import get_line_count_file
 from datetime import datetime
 
 subset_folder = 'data/subset'

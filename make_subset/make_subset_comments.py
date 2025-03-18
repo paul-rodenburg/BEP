@@ -92,8 +92,6 @@ def create_comment_subset(post_ids):
 
             if count_lines == LINES_SUBSET:
                 break
-        print(
-            f'Finished. Wrote {count_lines:,} lines... ({count_lines / count * 100:.1f}% | {count_lines / LINES_SUBSET * 100:.1f}%)')
 
 
 def make_subset_comments():

@@ -1,51 +1,9 @@
 from sqlalchemy.dialects.postgresql.pg_catalog import pg_get_serial_sequence
-from tqdm import tqdm
 import threading
 import sqlite3
 import os
 import re
-
-def get_line_count_file(file_path: str, timeout=20):
-    """"
-    Gets the number of lines in a file.
-
-    :param file_path: Path to the file.
-    :param timeout: Timeout in seconds, set to None for no timeout.
-
-    :return: Number of lines in a file (can be less if timeout is reached).
-
-    """
-    count = 0
-    file_path_short = file_path.split('/')[-1]
-    stop_event = threading.Event()
-    if timeout is None:
-        timeout_text = 'No timeout'
-    else:
-        timeout_text = f'Timeout: {timeout} seconds'
-    def count_lines():
-        nonlocal count
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                for _ in tqdm(f, desc=f'Counting lines in {file_path_short} ({timeout_text})'):
-                    if stop_event.is_set():
-                        break
-                    count += 1
-        except Exception as e:
-            print(f"\nError reading file: {e}")
-
-    thread = threading.Thread(target=count_lines)
-    thread.start()
-
-    if timeout is not None:
-        thread.join(timeout)
-        if thread.is_alive():
-            stop_event.set()
-            print("\nTimeout reached! Returning partial count.")
-            thread.join()  # Ensure thread stops before returning
-    else:
-        thread.join()  # Wait indefinitely if no timeout
-
-    return count
+from collections import deque
 
 
 def get_primary_key(table_name, sql_file_path="db_structure.sql"):
@@ -170,3 +128,18 @@ def get_tables_database(database_path='data.db'):
     conn.close()
 
     return table_list
+
+def read_file_reverse(file_path):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        # Initialize a deque with a fixed size, so it can store lines in reverse order
+        lines = deque(maxlen=1)  # Using deque to simulate the reverse reading
+        f.seek(0, 2)  # Seek to the end of the file
+        buffer = ''
+
+        while f.tell() > 0:
+            f.seek(f.tell() - 1024, 0)  # Move the pointer back 1024 bytes
+            buffer = f.read(1024) + buffer  # Read the chunk and add to buffer
+            lines = deque(buffer.splitlines(), maxlen=1)
+            if lines:
+                for line in reversed(lines):
+                    yield line  # Yield lines in reverse order

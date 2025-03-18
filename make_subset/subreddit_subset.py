@@ -3,7 +3,7 @@ import re
 import pickle
 import ujson as json
 from tqdm import tqdm
-from general import get_line_count_file
+from line_counts import get_line_count_file
 from config import (
     posts_subset_file, LINES_SUBSET,
     subreddit_rules_file, rules_subset_file, subreddit_wiki_file,
