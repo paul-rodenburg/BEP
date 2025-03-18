@@ -4,13 +4,25 @@ import pandas as pd
 import sqlite3
 import ujson as json
 import re
-from config import posts_subset_file, subset_files_tables, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file
-from make_subset import LINES_SUBSET
+from config import posts_subset_file, subset_files_tables, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file, LINES_SUBSET
 from tqdm import tqdm
 from general import get_line_count_file, get_primary_key
 from datetime import datetime
 
 subset_folder = 'data/subset'
+
+def get_ignore_usernames() -> set:
+    """
+    Gets a set containing usernames to be ignored (bots, moderators, deleted users) from ignored.txt
+
+    :return: set of usernames to be ignored
+    """
+    ignore_names = set()
+    with open('ignored.txt', 'r') as f:
+        for line in f:
+            ignore_names.add(line.strip())
+    return ignore_names
+
 
 def get_table_columns(sql_file_path, table_name):
     with open(sql_file_path, "r", encoding="utf-8") as f:
@@ -72,6 +84,8 @@ if __name__ == '__main__':
               subreddits_subset_file: get_line_count_file(subreddits_subset_file)}
 
     conn = sqlite3.connect('data.db')
+    ignore_names = get_ignore_usernames()
+
     for subset_file, tables in subset_files_tables.items():
         print(f'\nCleaning {subset_file.split("/")[-1]}')
         if len(tables) == 0:
@@ -79,20 +93,24 @@ if __name__ == '__main__':
         for table in tables:
             authors = set()
             clean_errors = 0
+
             # Skip table if it already exists
-            if table_exists(conn, table) and table not in ['removed', 'post']:
+            # if table_exists(conn, table) and table not in ['removed', 'post']:
+            if table_exists(conn, table):
                 print(f"Skipping {table}, already exists.")
                 continue
 
             with open(subset_file, 'r', encoding='utf-8') as f:
                 for line in tqdm(f, desc=f'Creating {table}', total=totals[subset_file]):
                     if table == 'author':
-                        author_pattern = re.compile(r'"author_fullname"\s*:\s*"([^"]+)"')
+                        author_fullname_pattern = re.compile(r'"author_fullname"\s*:\s*"([^"]+)"')
+                        author_username_pattern = re.compile(r'"author"\s*:\s*"([^"]+)"')
                         try:
-                            author = author_pattern.search(line).group(1)
-                            if author in authors or author == '[deleted]': # Don't add already added authors and deleted authors
+                            author_fullname = author_fullname_pattern.search(line).group(1) # ID of author (username != ID)
+                            author_username = author_username_pattern.search(line).group(1) # Username of author (username != ID)
+                            if author_fullname in authors or author_username in ignore_names: # Don't add already added authors and ignored authors
                                 continue
-                            authors.add(author)
+                            authors.add(author_fullname)
                         except:  # author_fullname could not be found, author is likely to be deleted so don't add to database
                             continue
                     cleaned_line = clean_line(line, table)

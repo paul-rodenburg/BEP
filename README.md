@@ -14,3 +14,8 @@
 
 ## Run scripts
 [process here]
+
+## Sources
+
+- `ignored.txt`: [Download ignored.txt here](https://github.com/Watchful1/PushshiftDumps/blob/master/scripts/ignored.txt)
+  - Contains usernames that are ignored (common bot and moderator usernames and deleted user flag name)

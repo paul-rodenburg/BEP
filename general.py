@@ -18,12 +18,15 @@ def get_line_count_file(file_path: str, timeout=20):
     count = 0
     file_path_short = file_path.split('/')[-1]
     stop_event = threading.Event()
-
+    if timeout is None:
+        timeout_text = 'No timeout'
+    else:
+        timeout_text = f'Timeout: {timeout} seconds'
     def count_lines():
         nonlocal count
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                for _ in tqdm(f, desc=f'Counting lines in {file_path_short} (Timeout: {timeout} seconds)'):
+                for _ in tqdm(f, desc=f'Counting lines in {file_path_short} ({timeout_text})'):
                     if stop_event.is_set():
                         break
                     count += 1

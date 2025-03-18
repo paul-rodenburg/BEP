@@ -1,5 +1,4 @@
 import os
-import sys
 import re
 import pickle
 import ujson as json
@@ -59,24 +58,24 @@ def create_subreddit_subsets(list_subreddits, subreddits, skip_list):
 
         NUMBER_LINES_RULES = get_line_count_file(k, timeout=10)
         subreddit_pattern = re.compile(v['regex'])
-
+        count_line = 0
         with open(k, 'r', encoding='utf-8') as f:
             with open(v['file'], 'a', encoding='utf-8') as f_out:
                 for line in tqdm(f, desc=f'Making {k.split("/")[-1]} subset', total=NUMBER_LINES_RULES):
+                    count_line += 1
                     if k == subreddit_wiki_file:
                         data = json.loads(line)
                         match = re.search(r"(?<=/r/)[^/]+", data['path'])
                         if match:
                             data['subreddit'] = match.group()
                             if data['subreddit'] in subreddits:
-                                json.dump(data, f_out, ensure_ascii=False)
-                                f_out.write('\n')
+                                f_out.write(str(count_line))
                     else:
                         match = subreddit_pattern.search(line)
                         if match:
                             subreddit = match.group(1)[2:]  # Remove r/ prefix
                             if subreddit in subreddits:
-                                f_out.write(line)
+                                f_out.write(str(count_line))
 
 
 def make_subset_subreddits():
@@ -87,12 +86,12 @@ def make_subset_subreddits():
         subreddits_file: {'file': subreddits_subset_file, 'regex': r'"display_name_prefixed"\s*:\s*"([^"]+)"'}
     }
 
-    cache_file = 'cache/subreddit_names.pkl'
+    cache_file = f'cache/subreddit_names_{LINES_SUBSET}.pkl'
     skip_list = check_existing_files(list_subreddits)
 
     if len(skip_list) == len(list_subreddits):
         print('You chose to skip all. Exiting...')
-        sys.exit(0)
+        return
 
     subreddits = load_or_create_subreddit_cache(cache_file, posts_subset_file)
     create_subreddit_subsets(list_subreddits, subreddits, skip_list)

@@ -2,6 +2,22 @@ import os
 import ujson as json
 from tqdm import tqdm
 from config import *
+import sys
+
+def check_existing_file() -> bool:
+    """
+    Check if posts subset file exists and prompt the user.
+
+    :return: True if can continue
+    """
+    if os.path.isfile(posts_subset_file):
+        user_continue = input(f'{posts_subset_file} already exists. Do you want to continue? ([y]/n) ')
+        if user_continue.lower() == 'n':
+            return False
+        else:
+            os.remove(posts_subset_file)
+            return True
+    return True
 
 
 def find_non_empty_nested_keys(obj, parent_key=""):
@@ -30,37 +46,36 @@ def find_non_empty_nested_keys(obj, parent_key=""):
 
     return nested_keys
 
-def make_post_subset():
-    # Subset files paths
-    os.makedirs('data/subset', exist_ok=True)
 
-    if os.path.isfile(posts_subset_file):
-        # Ask user to delete file to regenerate it
-        delete_file = input('Do you want to delete the posts 2025 subset file? ([y]/n): ')
-        if delete_file.lower() != 'n':  # Default option is to delete the file (y)
-            os.remove(posts_subset_file)
-            # Make empty file (the process that creates the subset will only append lines; this is only possible when a file already exists)
-            with open(posts_subset_file, 'w', encoding='utf-8') as f:
-                pass  # Creates an empty file
-
-
+def create_post_subset_file():
     # Find lines with nested JSON objects
     count = 0
     count_lines = 0
     with open(posts_2025_file, 'r', encoding='utf-8') as f:
-        for line in tqdm(f, desc=f'Reading lines... (Will write {LINES_SUBSET:,} lines in total)', total=int(LINES_SUBSET/0.2)):
+        for line in tqdm(f, desc=f'Processing post lines... (Will write max {int(LINES_SUBSET/1_000_000)}M lines in total)', total=int(LINES_SUBSET/0.2)):
             count += 1
             line_json = json.loads(line)  # Parse JSON
             nested_keys = find_non_empty_nested_keys(line_json)  # Find non-empty nested JSON
 
             if nested_keys:  # Only print if nested objects have length > 0
                 count_lines += 1
-                with open(posts_subset_file, 'a', encoding='utf-8') as f:
-                    f.write(line)
-            if count % 50000 == 0:
+                with open(posts_subset_file, 'a', encoding='utf-8') as f_out:
+                    f_out.write(str(count))
+            if count_lines % 100_000 == 0:
                 print(f'Wrote {count_lines:,} lines...({count_lines/count*100:.1f}% | {count_lines/LINES_SUBSET*100:.1f}%)')
             if count_lines == LINES_SUBSET:
                 break
+        print(f'Finished. Wrote {count_lines:,} lines...({count_lines / count * 100:.1f}% | {count_lines / LINES_SUBSET * 100:.1f}%)')
+
+
+def make_post_subset():
+    # Subset files paths
+    os.makedirs('data/subset', exist_ok=True)
+
+    if check_existing_file():
+        create_post_subset_file()
+    else:
+        print('Skipping creating post subset...')
 
 
 if __name__ == '__main__':

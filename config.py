@@ -1,5 +1,5 @@
 # Config
-LINES_SUBSET = 10000000  # Number of lines/comments/posts in the subset
+LINES_SUBSET = 20_000_000  # Number of lines/comments/posts in the subset (_ for better readability)
 
 posts_subset_file = 'data/subset/subset_posts'
 comments_subset_file = 'data/subset/subset_comments'
@@ -25,3 +25,9 @@ subset_files_tables = {posts_subset_file: ['post', 'author', 'banned', 'removed'
                        wikis_subset_file: ['wiki', 'revision_wiki'],
                        subreddits_subset_file: ['subreddit', 'subreddit_metadata', 'subreddit_settings',
                                                 'subreddit_media', 'subreddit_permissions', 'subreddit_comment_media']}
+
+subset_to_original = {posts_subset_file: posts_2025_file,
+                      comments_subset_file: comments_file,
+                      rules_subset_file: subreddit_rules_file,
+                      wikis_subset_file: subreddit_wiki_file,
+                      subreddits_subset_file: subreddits_file}
