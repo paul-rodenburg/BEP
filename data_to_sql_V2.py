@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 import sqlite3
 from config import posts_subset_file, LINES_SUBSET, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file, posts_2025_file, subset_files_tables, subset_to_original

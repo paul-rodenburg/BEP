@@ -11,7 +11,7 @@ def count_lines_in_file(file_path):
     with open(file_path, "r", encoding="utf-8") as file:
         return sum(1 for _ in file)
 
-def get_line_count_file(file_path: str, timeout=20):
+def get_line_count_file(file_path: str):
     """
     Get the line count of a file. If the file is cached and the MD5 hash is correct,
     return the cached line count. If not, compute the line count, hash, and update the cache.

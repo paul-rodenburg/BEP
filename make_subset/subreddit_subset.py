@@ -56,7 +56,7 @@ def create_subreddit_subsets(list_subreddits, subreddits, skip_list):
         if k in skip_list:
             continue  # Skip processing if user chose to skip
 
-        NUMBER_LINES_RULES = get_line_count_file(k, timeout=10)
+        NUMBER_LINES_RULES = get_line_count_file(k)
         subreddit_pattern = re.compile(v['regex'])
         count_line = 0
         with open(k, 'r', encoding='utf-8') as f:
