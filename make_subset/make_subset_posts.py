@@ -11,7 +11,7 @@ def check_existing_file() -> bool:
     :return: True if can continue
     """
     if os.path.isfile(posts_subset_file):
-        user_continue = input(f'{posts_subset_file} already exists. Do you want to continue? ([y]/n) ')
+        user_continue = input(f'{posts_subset_file} already exists. Do you want to replace it? ([y]/n) ')
         if user_continue.lower() == 'n':
             return False
         else:
@@ -52,7 +52,8 @@ def create_post_subset_file():
     count = 0
     count_lines = 0
     with open(posts_2025_file, 'r', encoding='utf-8') as f:
-        for line in tqdm(f, desc=f'Processing post lines... (Will write max {int(LINES_SUBSET/1_000_000)}M lines in total)', total=int(LINES_SUBSET/0.2)):
+        progress_bar = tqdm(f, desc=f'Processing posts (writing max {int(LINES_SUBSET/1_000_000)}M lines)', total=int(LINES_SUBSET/0.2))
+        for line in progress_bar:
             count += 1
             line_json = json.loads(line)  # Parse JSON
             nested_keys = find_non_empty_nested_keys(line_json)  # Find non-empty nested JSON
@@ -60,9 +61,9 @@ def create_post_subset_file():
             if nested_keys:  # Only print if nested objects have length > 0
                 count_lines += 1
                 with open(posts_subset_file, 'a', encoding='utf-8') as f_out:
-                    f_out.write(str(count))
-            if count_lines % 100_000 == 0:
-                print(f'Wrote {count_lines:,} lines...({count_lines/count*100:.1f}% | {count_lines/LINES_SUBSET*100:.1f}%)')
+                    f_out.write(f"{count}\n")
+            if count_lines % 3_000 == 0:  # Update only every 3,000 lines to maximize performance
+                progress_bar.set_postfix_str(f'Wrote {count_lines:,} lines...({count_lines/count*100:.1f}% | {count_lines/LINES_SUBSET*100:.1f}%)')
             if count_lines == LINES_SUBSET:
                 break
         print(f'Finished. Wrote {count_lines:,} lines...({count_lines / count * 100:.1f}% | {count_lines / LINES_SUBSET * 100:.1f}%)')

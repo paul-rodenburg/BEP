@@ -69,13 +69,13 @@ def create_subreddit_subsets(list_subreddits, subreddits, skip_list):
                         if match:
                             data['subreddit'] = match.group()
                             if data['subreddit'] in subreddits:
-                                f_out.write(str(count_line))
+                                f_out.write(f"{count_line}\n")
                     else:
                         match = subreddit_pattern.search(line)
                         if match:
                             subreddit = match.group(1)[2:]  # Remove r/ prefix
                             if subreddit in subreddits:
-                                f_out.write(str(count_line))
+                                f_out.write(f"{count_line}\n")
 
 
 def make_subset_subreddits():

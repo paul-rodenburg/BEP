@@ -16,7 +16,7 @@ def check_existing_file() -> bool:
     :return: True if can continue
     """
     if os.path.isfile(comments_subset_file):
-        user_continue = input(f'{comments_subset_file} already exists. Do you want to continue? ([y]/n) ')
+        user_continue = input(f'{comments_subset_file} already exists. Do you want to replace it? ([y]/n) ')
         if user_continue.lower() == 'n':
             return False
         else:
@@ -79,17 +79,17 @@ def create_comment_subset(post_ids):
     count = 0
 
     with open(comments_file, 'r', encoding='utf-8') as f:
-        for line in tqdm(f, desc=f'Processing comment lines... (Will write max {int(LINES_SUBSET/1_000_000)}M lines in total)', total=LINES_SUBSET / 0.1):  # Approximation
+        progress_bar = tqdm(f, desc=f'Processing comments (writing max {int(LINES_SUBSET/1_000_000)}M lines)', total=LINES_SUBSET / 0.1)  # Approximation
+        for line in progress_bar:
             count += 1
             parent_id = find_parent_post(line)
             if parent_id and parent_id in post_ids:
                 with open(comments_subset_file, 'a', encoding='utf-8') as f_out:
-                    f_out.write(str(count))
+                    f_out.write(f"{count}\n")
                 count_lines += 1
 
-            if count_lines % 100_000 == 0:
-                print(
-                    f'Wrote {count_lines:,} lines... ({count_lines / count * 100:.1f}% | {count_lines / LINES_SUBSET * 100:.1f}%)')
+            if count_lines % 3_000 == 0:  # Update only every 3,000 lines to maximize performance
+                progress_bar.set_postfix_str(f'Wrote {count_lines:,} lines... ({count_lines / count * 100:.1f}% | {count_lines / LINES_SUBSET * 100:.1f}%)')
 
             if count_lines == LINES_SUBSET:
                 break

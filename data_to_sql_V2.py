@@ -26,7 +26,7 @@ def process_cleaned_lines(cleaned_lines) -> pd.DataFrame:
     return df_processed
 
 
-def extract_lines(line_file, content_file, table, nr_lines) -> pd.DataFrame:
+def extract_lines(line_file, content_file, table) -> pd.DataFrame:
     """"
     Extract the lines from the original data file using the lines in subset file.
 
@@ -37,7 +37,7 @@ def extract_lines(line_file, content_file, table, nr_lines) -> pd.DataFrame:
     :return DataFrame containing lines.
     """
     lines_clean = []
-    with open(line_file, 'r') as fa, open(content_file, 'r') as fb:
+    with open(line_file, 'r', encoding='utf-8') as fa, open(content_file, 'r', encoding='utf-8') as fb:
         line_numbers = (int(line.strip()) for line in fa)
         current_line_number = next(line_numbers, None)  # Get first line number
 
@@ -70,5 +70,5 @@ if __name__ == '__main__':
         original_file = subset_to_original[subset_line_file]
 
         for table in subset_files_tables[subset_line_file]:
-            df = extract_lines(subset_line_file, original_file, table, total_lines)
+            df = extract_lines(subset_line_file, original_file, table)
             df.to_sql(table, conn, if_exists="replace", index=False)
