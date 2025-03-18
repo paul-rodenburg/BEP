@@ -4,7 +4,8 @@ import time
 from pathlib import Path
 import os
 
-CACHE_FILE = "file_counts.json"
+CACHE_FILE = "cache/file_counts.json"
+os.makedirs('cache', exist_ok=True)
 
 def count_lines_in_file(file_path):
     """Count the number of lines in a file."""
@@ -126,7 +127,7 @@ def make_dict_file_counts(files):
         else:
             print(f"Processing {file} (hash changed or new file)")
             time.sleep(0.5)
-            line_count = get_line_count_file(file, timeout=None)
+            line_count = get_line_count_file(file)
             updated_data.append({"path": file, "line_count": line_count, "hash": file_hash})
 
     return updated_data
