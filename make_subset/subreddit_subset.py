@@ -5,10 +5,11 @@ import ujson as json
 from tqdm import tqdm
 from line_counts import get_line_count_file
 from config import (
-    posts_subset_file, LINES_SUBSET,
+    posts_subset_base_name, LINES_SUBSET,
     subreddit_rules_file, rules_subset_file, subreddit_wiki_file,
-    subreddits_file, wikis_subset_file, subreddits_subset_file
+    subreddits_file, wikis_subset_file, subreddits_subset_file, dates_subsets, dates_to_original_file
 )
+import time
 
 
 def check_existing_files(list_subreddits):
@@ -30,33 +31,60 @@ def check_existing_files(list_subreddits):
     return skip_list
 
 
-def load_or_create_subreddit_cache(cache_file, posts_subset_file):
-    """Load subreddit names from cache or extract them from the posts subset file."""
-    id_pattern = re.compile(r'"subreddit_name_prefixed"\s*:\s*"([^"]+)"')
+def load_or_create_subreddit_cache(cache_file):
+    """Load subreddit names from cache or extract them from the posts subset file efficiently."""
+    id_pattern = re.compile(r'"subreddit_name_prefixed"\s*:\s*"r/([^"]+)"')
+
     if os.path.isfile(cache_file):
         with open(cache_file, 'rb') as f:
             return pickle.load(f)
 
     subreddits = set()
-    with open(posts_subset_file, 'r', encoding='utf-8') as f:
-        for line in tqdm(f, desc='Making subreddit set', total=LINES_SUBSET):
-            match = id_pattern.search(line)
-            if match:
-                subreddit = match.group(1)[2:]  # Remove r/ prefix
-                subreddits.add(subreddit)
+    line_numbers = []
+    progress_bar = tqdm(desc=f'Making subreddit set', total=LINES_SUBSET)
 
+    for i in range(len(dates_subsets)):
+        date = dates_subsets[i]
+        progress_bar.set_postfix_str(f'{date} ({i+1}/{len(dates_subsets)})')
+        with open(f'{posts_subset_base_name}_{date}', 'r', encoding='utf-8') as f:
+            line_numbers.extend(int(line.strip()) for line in f if line.strip().isdigit())
+
+        # Read the content file once
+        with open(dates_to_original_file[date], 'r', encoding='utf-8') as content_file:
+            current_line_number = 0
+            target_index = 0  # Index for tracking required line numbers
+
+            for content in content_file:
+                if target_index >= len(line_numbers):  # Stop when all required lines are processed
+                    break
+
+                if current_line_number == line_numbers[target_index]:
+                    match = id_pattern.search(content)
+                    if match:
+                        subreddit = match.group(1)  # Extract subreddit name
+                        subreddits.add(subreddit)
+                    target_index += 1  # Move to the next required line
+                    progress_bar.update(1)
+
+                current_line_number += 1
+
+    progress_bar.close()
+
+    # Save subreddits to cache
     with open(cache_file, 'wb') as f:
         pickle.dump(subreddits, f)
+
     return subreddits
 
 
 def create_subreddit_subsets(list_subreddits, subreddits, skip_list):
-    """Create subreddit subsets based on the extracted subreddit names."""
+    """Create subreddit subsets"""
     for k, v in list_subreddits.items():
         if k in skip_list:
             continue  # Skip processing if user chose to skip
 
         NUMBER_LINES_RULES = get_line_count_file(k)
+        time.sleep(0.2)  # Wait a bit so prints dont interfere with tqdm progress bar
         subreddit_pattern = re.compile(v['regex'])
         count_line = 0
         with open(k, 'r', encoding='utf-8') as f:
@@ -67,9 +95,9 @@ def create_subreddit_subsets(list_subreddits, subreddits, skip_list):
                         data = json.loads(line)
                         match = re.search(r"(?<=/r/)[^/]+", data['path'])
                         if match:
-                            data['subreddit'] = match.group()
-                            if data['subreddit'] in subreddits:
-                                f_out.write(f"{count_line}\n")
+                            subreddit = match.group()
+                            if subreddit in subreddits:
+                                f_out.write(f"{count_line} - {subreddit}\n")
                     else:
                         match = subreddit_pattern.search(line)
                         if match:
@@ -86,6 +114,11 @@ def make_subset_subreddits():
         subreddits_file: {'file': subreddits_subset_file, 'regex': r'"display_name_prefixed"\s*:\s*"([^"]+)"'}
     }
 
+    for date in dates_subsets:  # If post subsets don't exist, then exit
+        if not os.path.isfile(f'{posts_subset_base_name}_{date}'):
+            print(f'{posts_subset_base_name}_{date} does not exist. Make sure to create the post subsets first. Exiting...')
+            return
+
     cache_file = f'cache/subreddit_names_{LINES_SUBSET}.pkl'
     skip_list = check_existing_files(list_subreddits)
 
@@ -93,7 +126,7 @@ def make_subset_subreddits():
         print('You chose to skip all. Exiting...')
         return
 
-    subreddits = load_or_create_subreddit_cache(cache_file, posts_subset_file)
+    subreddits = load_or_create_subreddit_cache(cache_file)
     create_subreddit_subsets(list_subreddits, subreddits, skip_list)
 
 

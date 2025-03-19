@@ -10,7 +10,7 @@ def check_existing_file() -> list:
 
     :return: a list of dates to skip
     """
-    subset_files = [f'{posts_subset_file}_{date}' for date in dates_subsets]
+    subset_files = [f'{posts_subset_base_name}_{date}' for date in dates_subsets]
 
     # Check if any file exists
     existing_files = [file for file in subset_files if os.path.isfile(file)]
@@ -58,7 +58,7 @@ def find_non_empty_nested_keys(obj, parent_key=""):
 def init_count_lines(skip_dates) -> int:
     if len(skip_dates) == 0:
         return 0
-    files_to_count = [f'{posts_subset_file}_{i}' for i in skip_dates]
+    files_to_count = [f'{posts_subset_base_name}_{i}' for i in skip_dates]
     count_lines = 0
     for file in files_to_count:
         count_lines += get_line_count_file(file)
@@ -68,7 +68,7 @@ def init_count_lines(skip_dates) -> int:
 def create_post_subset_file(skip_dates):
     count_lines = init_count_lines(skip_dates)
     print(f'count_lines init to {count_lines:,}')
-    progress_bar = tqdm(desc='Processing posts', total=LINES_SUBSET)
+    progress_bar = tqdm(desc='Processing posts', total=LINES_SUBSET-count_lines)
 
     def process_file(file_path, date):
         """Helper function to process a file and extract lines."""
@@ -82,7 +82,7 @@ def create_post_subset_file(skip_dates):
 
                 if nested_keys:  # Only process if nested objects exist
                     count_lines += 1
-                    with open(f'{posts_subset_file}_{date}', 'a', encoding='utf-8') as f_out:
+                    with open(f'{posts_subset_base_name}_{date}', 'a', encoding='utf-8') as f_out:
                         f_out.write(f"{count}\n")
 
                     progress_bar.update(1)
@@ -93,11 +93,11 @@ def create_post_subset_file(skip_dates):
     dates_subsets_processed = [i for i in dates_subsets if i not in skip_dates]
 
     for i in range(len(dates_subsets_processed)):
-        subset_file = dates_to_subset[dates_subsets_processed[i]]
+        subset_file = dates_to_original_file[dates_subsets_processed[i]]
         process_file(subset_file, dates_subsets_processed[i])
         if count_lines < LINES_SUBSET and i != len(dates_subsets_processed) - 1:
             progress_bar.set_postfix_str(f'{dates_subsets_processed[i]} had not enough posts. Continuing with {dates_subsets_processed[i+1]}')
-        else:
+        elif count_lines < LINES_SUBSET and i == len(dates_subsets_processed) - 1:
             print(f'{dates_subsets_processed[i]} had not enough posts (wanted: {LINES_SUBSET:,}; got: {count_lines:,}) ')
             break
 
@@ -114,7 +114,7 @@ def make_post_subset():
     if len(skip_dates) == 0:
         print(f'Rebuilding subset posts for all dates ({dates_subsets})')
     else:
-        print(f'Skipping subset posts for {dates_subsets}')
+        print(f'Skipping subset posts for {skip_dates}')
     create_post_subset_file(skip_dates)
 
 

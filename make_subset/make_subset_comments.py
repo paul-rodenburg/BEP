@@ -1,9 +1,9 @@
 import os
-import sys
 import re
 import pickle
+from general import extract_line
 from tqdm import tqdm
-from config import comments_file, posts_subset_file, comments_subset_file, LINES_SUBSET
+from config import comments_file, posts_subset_base_name, comments_subset_file, LINES_SUBSET, dates_subsets, dates_to_original_file
 
 # File paths
 post_ids_path = f'cache/post_ids_{LINES_SUBSET}.pkl'
@@ -37,12 +37,38 @@ def load_or_create_post_ids():
         with open(post_ids_path, 'rb') as f:
             post_ids = pickle.load(f)
     else:
-        with open(posts_subset_file, 'r', encoding='utf-8') as f:
-            for line in tqdm(f, desc='Making post id list', total=LINES_SUBSET):
-                match = id_pattern.search(line)
-                if match:
-                    post_id = match.group(1)
-                    post_ids.add(post_id)
+        progress_bar_post_id = tqdm(desc=f'Making post id list', total=LINES_SUBSET)
+        for i in range(len(dates_subsets)):
+            date = dates_subsets[i]
+            progress_bar_post_id.set_postfix_str(f'{date} ({i+1}/{len(dates_subsets)})')
+            line_numbers = []
+
+            # Collect all required line numbers
+            with open(f'{posts_subset_base_name}_{date}', 'r', encoding='utf-8') as f:
+                line_numbers.extend(int(line.strip()) for line in f if line.strip().isdigit())
+
+            # Read the content file once
+            with open(dates_to_original_file[date], 'r', encoding='utf-8') as content_file:
+                current_line_number = 0
+                target_index = 0  # Index for tracking required line numbers
+
+                for content in content_file:
+                    if target_index >= len(line_numbers):  # Stop when all required lines are processed
+                        break
+
+                    if current_line_number == line_numbers[target_index]:
+                        match = id_pattern.search(content)
+                        if match:
+                            post_id = match.group(1)
+                            post_ids.add(post_id)
+                        target_index += 1  # Move to the next required line
+                        progress_bar_post_id.update(1)
+
+                    current_line_number += 1
+
+        progress_bar_post_id.close()
+
+        # Save post IDs to cache
         with open(post_ids_path, 'wb') as f:
             pickle.dump(post_ids, f)
 
@@ -77,7 +103,6 @@ def create_comment_subset(post_ids):
     """
     count_lines = 0
     count = 0
-
     with open(comments_file, 'r', encoding='utf-8') as f:
         progress_bar = tqdm(desc=f'Processing comments', total=LINES_SUBSET)
 
@@ -100,6 +125,11 @@ def make_subset_comments():
     """
     # Subset files paths
     os.makedirs('data/subset', exist_ok=True)
+
+    for date in dates_subsets:  # If post subsets don't exist, then exit
+        if not os.path.isfile(f'{posts_subset_base_name}_{date}'):
+            print(f'{posts_subset_base_name}_{date} does not exist. Make sure to create the post subsets first. Exiting...')
+            return
 
     if check_existing_file():
         post_ids = load_or_create_post_ids()

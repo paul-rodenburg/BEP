@@ -5,6 +5,16 @@ import os
 import re
 from collections import deque
 
+def extract_line(line_nr, content_file_path):
+    line_nr = int(line_nr)
+    count_line_find = 0
+    with open(content_file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            count_line_find += 1
+            if count_line_find == line_nr:
+                return line
+
+
 
 def get_primary_key(table_name, sql_file_path="db_structure.sql"):
     """"

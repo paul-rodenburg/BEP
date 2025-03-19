@@ -3,7 +3,7 @@ import pandas as pd
 import sqlite3
 import ujson as json
 import re
-from config import posts_subset_file, subset_files_tables, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file, LINES_SUBSET
+from config import posts_subset_base_name, subset_files_tables, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file, LINES_SUBSET
 from tqdm import tqdm
 from general import get_primary_key
 from line_counts import get_line_count_file
@@ -77,7 +77,7 @@ def table_exists(conn, table_name):
 
 if __name__ == '__main__':
     cleaned_lines = []
-    totals = {posts_subset_file: LINES_SUBSET,
+    totals = {posts_subset_base_name: LINES_SUBSET,
               comments_subset_file: LINES_SUBSET,
               rules_subset_file: get_line_count_file(rules_subset_file),
               wikis_subset_file: get_line_count_file(wikis_subset_file),

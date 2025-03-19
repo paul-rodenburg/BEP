@@ -1,6 +1,6 @@
 import pandas as pd
 import sqlite3
-from config import posts_subset_file, LINES_SUBSET, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file, posts_2025_file, subset_files_tables, subset_to_original
+from config import posts_subset_base_name, LINES_SUBSET, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file, posts_2025_1_file, subset_files_tables, subset_to_original, dates_subsets, dates_to_original_file
 from general import get_primary_key
 from line_counts import get_line_count_file
 from data_to_sql import clean_line
@@ -26,49 +26,79 @@ def process_cleaned_lines(cleaned_lines) -> pd.DataFrame:
     return df_processed
 
 
+import pandas as pd
+from tqdm import tqdm
+
+
 def extract_lines(line_file, content_file, table) -> pd.DataFrame:
-    """"
-    Extract the lines from the original data file using the lines in subset file.
+    """
+    Extract the lines from the original data file using the lines in subset file efficiently.
 
     :param line_file: original lines file
     :param content_file: content file
     :param table: table name for the SQL database where data is going to be stored
-    :param nr_lines: number of lines to extract (only used for tqdm progress bar)
-    :return DataFrame containing lines.
+    :return: DataFrame containing extracted lines.
     """
     lines_clean = []
-    with open(line_file, 'r', encoding='utf-8') as fa, open(content_file, 'r', encoding='utf-8') as fb:
-        line_numbers = (int(line.strip()) for line in fa)
-        current_line_number = next(line_numbers, None)  # Get first line number
 
-        fb_lines = fb.readlines()
-        total_lines_fb = len(fb_lines)
+    # Read and store line numbers in increasing order
+    with open(line_file, 'r', encoding='utf-8') as fa:
+        line_numbers = [int(line.strip()) for line in fa if line.strip().isdigit()]
 
-        for i, line in tqdm(enumerate(fb_lines, start=1), total=total_lines_fb, desc=f"Processing {table}"):
-            while current_line_number is not None and i == current_line_number:
+    total_lines = get_line_count_file(line_file)
+
+    progress_bar = tqdm(total=total_lines, desc=f"Processing {table}")
+
+    with open(content_file, 'r', encoding='utf-8') as fb:
+        current_line_number = 0
+        target_index = 0  # Index for tracking required line numbers
+
+        for line in fb:
+            if target_index >= total_lines:
+                break  # Stop when all required lines are processed
+
+            if current_line_number == line_numbers[target_index]:
                 clean_lined = clean_line(line, table)
                 lines_clean.append(clean_lined)
-                current_line_number = next(line_numbers, None)  # Get next line number
+                target_index += 1  # Move to the next required line
+                progress_bar.update(1)
 
-                if current_line_number is None:
-                    df_clean = process_cleaned_lines(lines_clean)
-                    return df_clean
+            current_line_number += 1
 
-    df_clean = process_cleaned_lines(lines_clean)
-    return df_clean
+    progress_bar.close()
+
+    return process_cleaned_lines(lines_clean)
+
 
 if __name__ == '__main__':
     conn = sqlite3.connect('data.db')
+    cursor = conn.cursor()
 
-    totals = {posts_subset_file: LINES_SUBSET,
-              comments_subset_file: LINES_SUBSET,
-              rules_subset_file: get_line_count_file(rules_subset_file),
-              wikis_subset_file: get_line_count_file(wikis_subset_file),
-              subreddits_subset_file: get_line_count_file(subreddits_subset_file)}
+    # Get all table names in the database
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = [row[0] for row in cursor.fetchall()]  # Extract table names from query result
 
-    for subset_line_file, total_lines in totals.items():
-        original_file = subset_to_original[subset_line_file]
+    # Empty each table (because we are going to append
+    for table in tables:
+        print(f"Emptying table: {table}")
+        cursor.execute(f"DELETE FROM {table}")
+        conn.commit()
 
-        for table in subset_files_tables[subset_line_file]:
-            df = extract_lines(subset_line_file, original_file, table)
-            df.to_sql(table, conn, if_exists="replace", index=False)
+
+
+    subsets = [posts_subset_base_name, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file]
+
+    for subset_line_file in subsets:
+        if subset_line_file == posts_subset_base_name:
+            files = [f'{posts_subset_base_name}_{date}' for date in dates_subsets]
+            for file in files:
+                for table in subset_files_tables[subset_line_file]:
+                    date = file.split('_')[-1]
+                    df = extract_lines(file, dates_to_original_file[date], table)
+                    df.to_sql(table, conn, if_exists="append", index=False)
+        else:
+            original_file = subset_to_original[subset_line_file]
+
+            for table in subset_files_tables[subset_line_file]:
+                df = extract_lines(subset_line_file, original_file, table)
+                df.to_sql(table, conn, if_exists="append", index=False)

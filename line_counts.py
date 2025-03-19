@@ -41,6 +41,7 @@ def get_line_count_file(file_path: str):
 
     # If no cache or hash mismatch, compute line count and hash
     print(f"Computing line count for {file_path}")
+    time.sleep(0.2)  # Wait a bit so print dont interfere with tqdm progress bars
     line_count = count_lines_in_file(file_path)  # Replace with actual line count function
     file_hash, hash_method = compute_md5(file_path)  # Compute file hash
 
@@ -112,9 +113,11 @@ def compute_md5_full(file_path):
         return None  # In case of error
 
 
-def find_files_without_extension(root_folder):
+def find_files_without_extension(root_folder=None):
     """Find all files without extensions recursively."""
-    return [file.as_posix() for file in Path(root_folder).rglob('*') if file.is_file() and file.suffix == '']
+    if root_folder is None:
+        root_folder = ''
+    return [file.as_posix() for file in Path(root_folder).rglob('*') if file.is_file() and file.suffix == '' and '.' not in file.as_posix()]
 
 
 def load_cached_data():
@@ -165,9 +168,10 @@ def clean_invalid_files(file_path):
     with open(file_path, 'w') as file:
         json.dump(valid_data, file, indent=2)
 
-    # Print the number of objects removed
-    print(f"Number of objects removed: {removed_count}")
-    print(f"Cleaned JSON data has been saved to {file_path}")
+    if removed_count > 0:
+        # Print the number of objects removed
+        print(f"Number of objects removed: {removed_count}")
+        print(f"Cleaned JSON data has been saved to {file_path}")
 
 if __name__ == '__main__':
     files = find_files_without_extension('data')
@@ -175,4 +179,4 @@ if __name__ == '__main__':
     save_cached_data(data)
 
     # Clean JSON (remove objects with files that do not exist anymore)
-    # clean_invalid_files(CACHE_FILE)
+    clean_invalid_files(CACHE_FILE)

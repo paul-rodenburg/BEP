@@ -1,10 +1,10 @@
 import json
 from make_subset_posts import find_non_empty_nested_keys
 from data_to_sql import clean_line
-from config import posts_2025_file, subset_files_tables, posts_subset_file
+from config import posts_2025_1_file, subset_files_tables, posts_subset_base_name
 
-tables = subset_files_tables[posts_subset_file]
-with open(posts_2025_file, 'r', encoding='utf-8') as f:
+tables = subset_files_tables[posts_subset_base_name]
+with open(posts_2025_1_file, 'r', encoding='utf-8') as f:
     for line in f:
         nested_keys = find_non_empty_nested_keys(json.loads(line))
         if nested_keys:
