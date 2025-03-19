@@ -15,5 +15,5 @@ if __name__ == "__main__":
 
     # Run functions to make subsets
     make_post_subset()
-    make_subset_comments()
-    make_subset_subreddits()
+    # make_subset_comments()
+    # make_subset_subreddits()

@@ -18,10 +18,13 @@ def check_existing_file() -> list:
 
     for existing_file in existing_files:
         date_file = existing_file.split('_')[-1]
-        user_continue = input(f"The post file for date {date_file}. Do you want to replace them? ([y]/n) ").strip().lower()
-        if user_continue == 'n':
-            continue
-        skip_dates.append(date_file)
+        user_continue = input(f"The post file for date {date_file}. What do you want? skip [s] replace [r]").strip().lower()
+        if user_continue == 's':
+            skip_dates.append(date_file)
+        if user_continue == 'r':
+            os.remove(existing_file)
+            print(f'\033[91mRemoved {existing_file}\033[0m')  # Print in red
+
 
     return skip_dates
 
@@ -55,7 +58,7 @@ def find_non_empty_nested_keys(obj, parent_key=""):
 def init_count_lines(skip_dates) -> int:
     if len(skip_dates) == 0:
         return 0
-    files_to_count = [f'{posts_subset_file}_{i}' for i in dates_to_subset[skip_dates]]
+    files_to_count = [f'{posts_subset_file}_{i}' for i in skip_dates]
     count_lines = 0
     for file in files_to_count:
         count_lines += get_line_count_file(file)
@@ -108,6 +111,10 @@ def make_post_subset():
     os.makedirs('data/subset', exist_ok=True)
 
     skip_dates = check_existing_file()
+    if len(skip_dates) == 0:
+        print(f'Rebuilding subset posts for all dates ({dates_subsets})')
+    else:
+        print(f'Skipping subset posts for {dates_subsets}')
     create_post_subset_file(skip_dates)
 
 
