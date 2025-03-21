@@ -5,6 +5,8 @@ from general import get_primary_key
 from line_counts import get_line_count_file
 from data_to_sql import clean_line
 from tqdm import tqdm
+import os
+import time
 
 def handle_author(line):
     return line
@@ -17,6 +19,9 @@ def process_cleaned_lines(cleaned_lines) -> pd.DataFrame:
     :return DataFrame containing cleaned lines.
     """
     df_processed = pd.DataFrame(cleaned_lines)
+    if len(df_processed) == 0 or df_processed is None:
+        return pd.DataFrame()
+
     primary_key_column = get_primary_key(table)
     df_processed = df_processed.drop_duplicates(subset=primary_key_column)
 
@@ -24,10 +29,6 @@ def process_cleaned_lines(cleaned_lines) -> pd.DataFrame:
     df_processed = df_processed.apply(lambda col: col.map(lambda x: str(x) if isinstance(x, dict) else x))
 
     return df_processed
-
-
-import pandas as pd
-from tqdm import tqdm
 
 
 def extract_lines(line_file, content_file, table) -> pd.DataFrame:
@@ -46,7 +47,7 @@ def extract_lines(line_file, content_file, table) -> pd.DataFrame:
         line_numbers = [int(line.strip()) for line in fa if line.strip().isdigit()]
 
     total_lines = get_line_count_file(line_file)
-
+    time.sleep(0.2)  # Wait a bit so print of line count doesnt interfere with tqdm progress bar
     progress_bar = tqdm(total=total_lines, desc=f"Processing {table}")
 
     with open(content_file, 'r', encoding='utf-8') as fb:
@@ -71,20 +72,14 @@ def extract_lines(line_file, content_file, table) -> pd.DataFrame:
 
 
 if __name__ == '__main__':
+    db_file = 'data.db'
+    if os.path.isfile(db_file):
+        user_remove_db = input(f'{db_file} already exists. Do you want to remove it? [y/[n]]').strip().lower()
+        if user_remove_db != 'y':
+            exit(0)  # Dont go further because user doesnt want to replace the db file
+        os.remove(db_file)
+        print(f'Removed {db_file} file')
     conn = sqlite3.connect('data.db')
-    cursor = conn.cursor()
-
-    # Get all table names in the database
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = [row[0] for row in cursor.fetchall()]  # Extract table names from query result
-
-    # Empty each table (because we are going to append
-    for table in tables:
-        print(f"Emptying table: {table}")
-        cursor.execute(f"DELETE FROM {table}")
-        conn.commit()
-
-
 
     subsets = [posts_subset_base_name, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file]
 
@@ -93,6 +88,8 @@ if __name__ == '__main__':
             files = [f'{posts_subset_base_name}_{date}' for date in dates_subsets]
             for file in files:
                 for table in subset_files_tables[subset_line_file]:
+                    if table in ['removed', 'banned']:
+                        continue
                     date = file.split('_')[-1]
                     df = extract_lines(file, dates_to_original_file[date], table)
                     df.to_sql(table, conn, if_exists="append", index=False)
@@ -100,5 +97,7 @@ if __name__ == '__main__':
             original_file = subset_to_original[subset_line_file]
 
             for table in subset_files_tables[subset_line_file]:
+                if table in ['removed', 'banned']:
+                    continue
                 df = extract_lines(subset_line_file, original_file, table)
                 df.to_sql(table, conn, if_exists="append", index=False)
