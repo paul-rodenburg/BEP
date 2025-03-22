@@ -1,5 +1,3 @@
-from importlib.resources.readers import remove_duplicates
-
 import pandas as pd
 import sqlite3
 from config import posts_subset_base_name, LINES_SUBSET, comments_subset_file, rules_subset_file, wikis_subset_file, subreddits_subset_file, posts_2025_1_file, subset_files_tables, subset_to_original, dates_subsets, dates_to_original_file
@@ -10,14 +8,18 @@ from tqdm import tqdm
 import os
 import time
 import json
+import math
+
+progress_bar = None
 
 def handle_author(line):
     return line
 
-def process_cleaned_lines(cleaned_lines) -> pd.DataFrame:
+def process_cleaned_lines(cleaned_lines, table) -> pd.DataFrame:
     """"
     Converts list of cleaned lines into a DataFrame.
     :param cleaned_lines: list of cleaned lines
+    :param table: table name
 
     :return DataFrame containing cleaned lines.
     """
@@ -28,13 +30,18 @@ def process_cleaned_lines(cleaned_lines) -> pd.DataFrame:
     primary_key_column = get_primary_key(table)
     df_processed = df_processed.drop_duplicates(subset=primary_key_column)
 
-    df_processed = df_processed.apply(lambda col: col.map(lambda x: str(x) if isinstance(x, list) else x))
-    df_processed = df_processed.apply(lambda col: col.map(lambda x: str(x) if isinstance(x, dict) else x))
+    df_processed = df_processed.map(lambda x: str(x) if isinstance(x, (list, dict)) else x)
 
     return df_processed
 
+def process_table(subset_file, original_file, table, conn, chunk_size=10_000, wiki=False):
+    for df_chunk in extract_lines(subset_file, original_file, table, wiki, chunk_size):
+        if not df_chunk.empty:
+            write_to_db(df_chunk, table, conn, chunk_size=chunk_size)
 
-def extract_lines(line_file, content_file, table, wiki=False) -> pd.DataFrame:
+
+def extract_lines(line_file, content_file, table, wiki=False, chunk_size=10_000) -> pd.DataFrame:
+    global progress_bar
     """
     Extract the lines from the original data file using the lines in subset file efficiently.
 
@@ -42,6 +49,7 @@ def extract_lines(line_file, content_file, table, wiki=False) -> pd.DataFrame:
     :param content_file: content file
     :param table: table name for the SQL database where data is going to be stored
     :param wiki: if set to True then subreddit name is also in lien file (seperated from lines by a -)
+    :param chunk_size: number of lines to read at a time
     :return: DataFrame containing extracted lines.
     """
     lines_clean = []
@@ -80,11 +88,24 @@ def extract_lines(line_file, content_file, table, wiki=False) -> pd.DataFrame:
                 target_index += 1  # Move to the next required line
                 progress_bar.update(1)
 
+                if len(lines_clean) >= chunk_size:
+                    yield process_cleaned_lines(lines_clean, table)
+                    lines_clean = []
             current_line_number += 1
 
     progress_bar.close()
+    if lines_clean:
+        yield process_cleaned_lines(lines_clean, table)
 
-    return process_cleaned_lines(lines_clean)
+sql_count = 0
+
+def write_to_db(df, table, conn, chunk_size=10_000):
+    global sql_count, progress_bar
+
+    df.to_sql(table, conn, if_exists="append", index=False, chunksize=5000)
+    sql_count += 1
+    progress_bar.set_postfix_str(f'[{sql_count}/{math.ceil(progress_bar.total/chunk_size)} SQL writes]')
+
 
 def is_file_table_added_db(subset_file, table, db_info_file='db_info.json'):
     if os.path.isfile(subset_file):
@@ -133,11 +154,19 @@ def remove_duplicates_db(conn):
     # Loop over each table
     for table in tqdm(tables, desc='Removing duplicates from database'):
         table_name = table[0]
+        if table_name in ['post']:
+            continue  # There will be no duplicates in the posts and comments
         q = f'SELECT * FROM {table_name}'
         df_clean = pd.read_sql_query(q, conn)
         df_clean = df_clean.drop_duplicates(subset=get_primary_key(table_name))
         df_clean.to_sql(table_name, conn, if_exists='replace', index=False)
         df_clean = pd.DataFrame()  # Clean memory
+
+def delete_table_db(table_name, conn):
+    print(f'Deleting table {table_name}...')
+    cursor = conn.cursor()
+    cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
+
 
 if __name__ == '__main__':
     db_info_file = 'db_info.json'
@@ -173,8 +202,7 @@ if __name__ == '__main__':
                     if is_file_table_added_db(file, table):
                         continue
                     date = file.split('_')[-1]
-                    df = extract_lines(file, dates_to_original_file[date], table)
-                    df.to_sql(table, conn, if_exists="append", index=False)
+                    process_table(file, dates_to_original_file[date], table, conn)
                     add_file_table_db_info(file, table)
                     new_data_added = True
         else:
@@ -186,14 +214,13 @@ if __name__ == '__main__':
                 if is_file_table_added_db(subset_line_file, table):
                     continue
                 if 'wiki' in table:
-                    df = extract_lines(subset_line_file, original_file, table, wiki=True)
+                    process_table(subset_line_file, original_file, table, conn, wiki=True)
                 else:
-                    df = extract_lines(subset_line_file, original_file, table)
-                df.to_sql(table, conn, if_exists="append", index=False)
+                    process_table(subset_line_file, original_file, table, conn)
                 add_file_table_db_info(subset_line_file, table)
                 new_data_added = True
 
     if not new_data_added:
         print('No new data was added. Removing duplicates...')
-        time.sleep(0.2)  # Wait a bit so print doesnt interfere with the tqdm progress bar of removing duplicates
+        time.sleep(0.2)  # Wait a bit so print does not interfere with the tqdm progress bar of removing duplicates
     remove_duplicates_db(conn)

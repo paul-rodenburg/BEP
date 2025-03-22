@@ -24,7 +24,7 @@ dates_to_original_file = {'2025-1': posts_2025_1_file,
                           '2025-2': posts_2025_2_file}
 
 # SQL database
-subset_files_tables = {posts_subset_base_name: ['post', 'author', 'banned', 'removed'],
+subset_files_tables = {posts_subset_base_name: ['post', 'author', 'banned'],
                        comments_subset_file: ['comment'],
                        rules_subset_file: ['subreddit_rules'],
                        wikis_subset_file: ['wiki', 'revision_wiki'],

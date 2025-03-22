@@ -28,12 +28,6 @@ CREATE TABLE `post` (
   `banned_by` varchar(255)
 );
 
-CREATE TABLE `removed` (
-  `id` varchar(255) PRIMARY KEY,
-  `removal_reason` varchar(255), -- 'Can be NULL'
-  `removed_by` varchar(255) -- 'Can be NULL'
-);
-
 CREATE TABLE `author` (
   `author_fullname` varchar(255) PRIMARY KEY,
   `author` varchar(255),
@@ -174,10 +168,10 @@ CREATE TABLE `banned` (
 );
 
 CREATE TABLE `comment` (
-  `id` varchar(255),
+  `id` varchar(255) PRIMARY KEY,
   `parent_id` varchar(255),
   `body` varchar(255),
-  `author_fullname` varchar(255) PRIMARY KEY,
+  `author_fullname` varchar(255),
   `created_utc` timestamp,
   `archived` bool,
   `downs` integer,
@@ -246,9 +240,6 @@ CREATE TABLE `subreddit_comment_media_subreddit` (
 ALTER TABLE `subreddit_comment_media_subreddit` ADD FOREIGN KEY (`subreddit_comment_media_display_name`) REFERENCES `subreddit_comment_media` (`display_name`);
 
 ALTER TABLE `subreddit_comment_media_subreddit` ADD FOREIGN KEY (`subreddit_display_name`) REFERENCES `subreddit` (`display_name`);
-
-
-ALTER TABLE `removed` ADD FOREIGN KEY (`id`) REFERENCES `post` (`id`);
 
 ALTER TABLE `wiki` ADD FOREIGN KEY (`subreddit`) REFERENCES `subreddit` (`display_name`);
 
