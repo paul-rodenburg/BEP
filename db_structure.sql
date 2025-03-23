@@ -6,7 +6,7 @@ CREATE TABLE `post` (
   `archived` bool,
   `downs` integer,
   `ups` integer,
-  `edited` bool,
+  `edited` integer,
   `hidden` bool,
   `locked` bool,
   `num_comments` integer,

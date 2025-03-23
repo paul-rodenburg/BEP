@@ -14,6 +14,6 @@ if __name__ == "__main__":
     os.makedirs('data/subset', exist_ok=True)
 
     # Run functions to make subsets
-    # make_post_subset()
+    make_post_subset()
     make_subset_comments()
     make_subset_subreddits()
