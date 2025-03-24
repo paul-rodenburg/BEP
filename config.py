@@ -14,18 +14,20 @@ posts_2025_2_file = 'data/submissions/RS_2025-02/RS_2025-02'
 posts_2024_12_file = 'data/submissions/RS_2024-12/RS_2024-12'
 posts_2024_11_file = 'data/submissions/RS_2024-11/RS_2024-11'
 posts_2024_10_file = 'data/submissions/RS_2024-10/RS_2024-10'
+posts_2024_09_file = 'data/submissions/RS_2024-10/RS_2024-10'
 
 # Subreddit files
 subreddit_rules_file = 'data/subreddits/subreddit_rules_2025-01/subreddit_rules_2025-01'
 subreddit_wiki_file = 'data/subreddits/subreddit_wikis_2025-01/subreddit_wikis_2025-01'
 subreddits_file = 'data/subreddits/subreddits_2025-01/subreddits_2025-01'
 
-dates_subsets = ['2025-1', '2024-12', '2025-2', '2024-11', '2024-10']  # In order of priority
+dates_subsets = ['2025-1', '2024-12', '2025-2', '2024-11', '2024-10', '2024-09']  # In order of priority
 dates_to_original_file = {'2025-1': posts_2025_1_file,
                           '2024-12': posts_2024_12_file,
                           '2025-2': posts_2025_2_file,
                           '2024-11': posts_2024_11_file,
-                          '2024-10': posts_2024_10_file}
+                          '2024-10': posts_2024_10_file,
+                          '2024-09': posts_2024_09_file}
 
 # SQL database
 subset_files_tables = {posts_subset_base_name: ['post', 'author', 'banned'],

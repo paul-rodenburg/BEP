@@ -12,7 +12,7 @@ os.makedirs('cache', exist_ok=True)
 def count_lines_in_file(file_path):
     """Count the number of lines in a file."""
     with open(file_path, "r", encoding="utf-8") as file:
-        return sum(1 for _ in tqdm(file, desc="Counting lines", unit="line"))
+        return sum(1 for _ in tqdm(file, desc="Counting lines", unit="lines"))
 
 
 def get_line_count_file(file_path: str):
