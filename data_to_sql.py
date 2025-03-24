@@ -217,18 +217,15 @@ def remove_duplicates_db(conn):
 
 
 def delete_table_db(table_name, engine):
-    # Establish a connection from the SQLAlchemy engine
-    with engine.connect() as conn:
-        # For SQLite
-        if 'sqlite' in conn.dialect.name:
-            conn.execute(f"DROP TABLE IF EXISTS {table_name}")
-
-        # For PostgreSQL
-        elif 'postgresql' in conn.dialect.name:
+    if isinstance(engine, sqlite3.Connection):
+        engine.execute(f"DROP TABLE IF EXISTS {table_name}")
+        print(f'Deleted table {table_name} in SQLITE database')
+    elif isinstance(engine, Engine):
+        with engine.connect() as conn:
             conn.execute(text(f"DROP TABLE IF EXISTS {table_name} CASCADE"))
-
-        else:
-            raise ValueError(f'{type(conn)} is not supported')
+        print(f'Deleted table {table_name} in PostgreSQL database')
+    else:
+        raise ValueError(f'{type(engine)} is not supported')
 
 
 def get_tables(engine):
@@ -255,6 +252,9 @@ def process_data(conn):
 
     print(f'Only adding new data. To rebuild existing tables, remove them from the {db_info_file} file')
 
+    if not os.path.isfile(db_info_file):
+        with open(db_info_file, 'w', encoding='utf-8') as f:
+            json.dump([], f, indent=4)
     for table in get_tables(conn):
         delete_table = True
         with open(db_info_file, 'r', encoding='utf-8') as f:
