@@ -1,20 +1,16 @@
 from datetime import datetime
-
 import pandas as pd
 import json
 import os
 import time
 import math
-
 import sqlalchemy
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 from tqdm import tqdm
 from general import get_primary_key
 from line_counts import get_line_count_file
-from config import posts_subset_base_name, LINES_SUBSET, comments_subset_file, rules_subset_file, wikis_subset_file, \
-    subreddits_subset_file, posts_2025_1_file, subset_files_tables, subset_to_original, dates_subsets, \
-    dates_to_original_file
+from config import *
 import sqlite3
 import re
 
@@ -50,7 +46,6 @@ def clean_line(line, table_name, sql_file="db_structure.sql"):
     except:
         clean_errors += 1
         return None
-    # Change this to your actual .sql file path
     items_to_keep = get_table_columns(sql_file, table_name)
     if table_name in 'banned':
         if line['banned_at_utc'] is None and line['banned_by'] is None:
@@ -62,7 +57,13 @@ def clean_line(line, table_name, sql_file="db_structure.sql"):
         dt = datetime.fromisoformat(line['revision_date'].replace("Z", "+00:00"))
         epoch_time = int(dt.timestamp())
         line['revision_date'] = epoch_time
-    if table_name == 'post':
+        pattern = r"/r/([^/]+)"
+        subreddit_match = re.search(pattern, text)
+        if not subreddit_match:  # If the subreddit could not be found then return None since this data will be useless
+            return None
+        line['subreddit'] = subreddit_match.group(1)
+
+    if table_name == 'post':  # To not get any postgreSQL errors
         if int(line['edited']) == 0:
             line['edited'] = False
         else:
@@ -88,10 +89,13 @@ def process_cleaned_lines(cleaned_lines, table) -> pd.DataFrame:
     return df_processed
 
 
-def process_table(subset_file, original_file, table, conn, chunk_size=10_000, wiki=False):
+sql_count = 0
+
+def process_table(data_file, table, conn, chunk_size=10_000):
     global sql_count
+
     added_count = 0
-    for df_chunk in extract_lines(subset_file, original_file, table, wiki, chunk_size):
+    for df_chunk in extract_lines(data_file, table, chunk_size):
         if not df_chunk.empty:
             write_to_db(df_chunk, table, conn, chunk_size=chunk_size)
             added_count += 1
@@ -99,27 +103,12 @@ def process_table(subset_file, original_file, table, conn, chunk_size=10_000, wi
     if added_count == 0:
         print(f'Error! All chunks of {table} were empty')
 
-sql_count = 0
 
-
-def extract_lines(line_file, content_file, table, wiki=False, chunk_size=10_000) -> pd.DataFrame:
+def extract_lines(data_file, table, chunk_size=10_000) -> pd.DataFrame:
     global progress_bar
     lines_clean = []
 
-    with open(line_file, 'r', encoding='utf-8') as fa:
-        if wiki:
-            line_numbers = []
-            subreddits_wiki = []
-            for line in fa:
-                line_numbers.append(int(line.strip().split(' - ')[0]))
-                subreddits_wiki.append(str(line.strip().split(' - ')[-1]))
-            if len(subreddits_wiki) != len(subreddits_wiki):
-                print('ERROR! Len subreddits_wiki does not match subreddits_wiki.')
-                return pd.DataFrame()
-        else:
-            line_numbers = [int(line.strip()) for line in fa if line.strip().isdigit()]
-
-    total_lines = get_line_count_file(line_file)
+    total_lines = get_line_count_file(data_file)
     time.sleep(0.2)
     progress_bar = tqdm(total=total_lines, desc=f"Processing {table}", unit_scale=True)
 
@@ -128,29 +117,23 @@ def extract_lines(line_file, content_file, table, wiki=False, chunk_size=10_000)
         for ignored_name in ignored:
             ignored_author_names.add(ignored_name.strip())
 
-    with open(content_file, 'r', encoding='utf-8') as fb:
-        current_line_number = 0
-        target_index = 0
+    line_count = 0
+    with open(data_file, 'r', encoding='utf-8') as f_data:
 
-        for line in fb:
-            if target_index >= total_lines:
+        for line in f_data:
+            cleaned_line = clean_line(line, table)
+            if table == 'author':
+                if cleaned_line['author'] in ignored_author_names:
+                    continue
+            lines_clean.append(cleaned_line)
+            line_count += 1
+            progress_bar.update(1)
+
+            if len(lines_clean) >= chunk_size:
+                yield process_cleaned_lines(lines_clean, table)
+                lines_clean = []
+            if line_count >= LINES_SUBSET:
                 break
-
-            if current_line_number == line_numbers[target_index]:
-                cleaned_line = clean_line(line, table)
-                if table == 'wiki':
-                    cleaned_line['subreddit'] = subreddits_wiki[target_index]
-                if table == 'author':
-                    if cleaned_line['author'] in ignored_author_names:
-                        continue
-                lines_clean.append(cleaned_line)
-                target_index += 1
-                progress_bar.update(1)
-
-                if len(lines_clean) >= chunk_size:
-                    yield process_cleaned_lines(lines_clean, table)
-                    lines_clean = []
-            current_line_number += 1
 
     progress_bar.close()
     if lines_clean:
@@ -164,12 +147,12 @@ def write_to_db(df, table, conn, chunk_size=10_000):
     progress_bar.set_postfix_str(f'[{sql_count}/{math.ceil(progress_bar.total / chunk_size)} SQL writes]')
 
 
-def is_file_table_added_db(subset_file, table, db_info_file):
+def is_file_table_added_db(data_file, table, db_info_file):
     if os.path.isfile(db_info_file):
         with open(db_info_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         for obj in data:
-            if obj['file'] == subset_file:
+            if obj['file'] == data_file:
                 if table in obj['success_tables']:
                     return True
     return False
@@ -242,11 +225,11 @@ def get_tables(engine):
         raise ValueError(f'{type(engine)} is not supported')
 
 
-def process_data(conn):
+def process_data_without_filter(conn):
     if isinstance(conn, sqlite3.Connection):  # SQLite connection
-        db_info_file = 'databases/db_info_sqlite.json'
+        db_info_file = 'databases/db_info_sqlite_ALL.json'
     elif isinstance(conn, Engine):  # PostgreSQL connection
-        db_info_file = 'databases/db_info_post.json'
+        db_info_file = 'databases/db_info_post_ALL.json'
     else:
         raise ValueError(f'Only SQLite and Postgres connections are supported, not {type(conn)}')
 
@@ -266,37 +249,18 @@ def process_data(conn):
         if delete_table:
             delete_table_db(table, conn)
 
-    subsets = [posts_subset_base_name, comments_subset_file, rules_subset_file, wikis_subset_file,
-               subreddits_subset_file]
     new_data_added = False
 
-    for subset_line_file in subsets:
-        if subset_line_file == posts_subset_base_name:
-            files = [f'{posts_subset_base_name}_{date}' for date in dates_subsets]
-            for file in files:
-                for table in subset_files_tables[subset_line_file]:
-                    if table in ['removed', 'banned']:
-                        continue
-                    if is_file_table_added_db(file, table, db_info_file):
-                        continue
-                    date = file.split('_')[-1]
-                    process_table(file, dates_to_original_file[date], table, conn)
-                    add_file_table_db_info(file, table, db_info_file)
-                    new_data_added = True
-        else:
-            original_file = subset_to_original[subset_line_file]
+    for file in data_files:
+        for table in data_files_tables[file]:
+            if table in ['banned']:
+                continue
+            if is_file_table_added_db(file, table, db_info_file):
+                continue
+            process_table(file, table, conn)
+            add_file_table_db_info(file, table, db_info_file)
+            new_data_added = True
 
-            for table in subset_files_tables[subset_line_file]:
-                if table in ['removed', 'banned']:
-                    continue
-                if is_file_table_added_db(subset_line_file, table, db_info_file):
-                    continue
-                if 'wiki' in table:
-                    process_table(subset_line_file, original_file, table, conn, wiki=True)
-                else:
-                    process_table(subset_line_file, original_file, table, conn)
-                add_file_table_db_info(subset_line_file, table, db_info_file)
-                new_data_added = True
 
     if not new_data_added:
         print('No new data was added. Removing duplicates...')

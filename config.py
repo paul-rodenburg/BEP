@@ -37,6 +37,16 @@ subset_files_tables = {posts_subset_base_name: ['post', 'author', 'banned'],
                        subreddits_subset_file: ['subreddit', 'subreddit_metadata', 'subreddit_settings',
                                                 'subreddit_media', 'subreddit_permissions', 'subreddit_comment_media']}
 
+
+data_files = [posts_2025_1_file, comments_file, subreddits_file, subreddit_rules_file, subreddit_wiki_file]
+
+data_files_tables = {posts_2025_1_file: ['post', 'author', 'banned'],
+                     comments_file: ['comment'],
+                     subreddits_file: ['subreddit_rules'],
+                     subreddit_rules_file: ['wiki', 'revision_wiki'],
+                     subreddit_wiki_file: ['subreddit', 'subreddit_metadata', 'subreddit_settings',
+                                                'subreddit_media', 'subreddit_permissions', 'subreddit_comment_media']}
+
 subset_to_original = {comments_subset_file: comments_file,
                       rules_subset_file: subreddit_rules_file,
                       wikis_subset_file: subreddit_wiki_file,
