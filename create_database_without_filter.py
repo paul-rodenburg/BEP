@@ -4,7 +4,8 @@ import json
 import os
 import time
 import math
-import sqlalchemy
+
+from pandas.core.internals.construction import dataclasses_to_dicts
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 from tqdm import tqdm
@@ -14,7 +15,6 @@ from config import *
 import sqlite3
 import re
 
-tqdm.format_sizeof = lambda x, divisor=None: f"{x:,}" if divisor else f"{x:5.2f}"
 progress_bar = None
 clean_errors = 0
 
@@ -38,127 +38,156 @@ def get_table_columns(sql_file_path, table_name):
 
     return columns
 
-def clean_line(line, table_name, sql_file="db_structure.sql"):
+def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[str, dict]:
+    """
+    Gets a line and cleans it for all the tables.
+
+    :param line_input: line to clean
+    :param tables: tables for the line
+    :param table_columns: columns for the tables
+    :param ignored_author_names: author names to ignore.
+    :return: A dict with as key the table name and value the cleaned line for that table
+    """
     global clean_errors
 
     try:
-        line = json.loads(line)
+        line_input = json.loads(line_input)
     except:
         clean_errors += 1
         return None
-    items_to_keep = get_table_columns(sql_file, table_name)
-    if table_name in 'banned':
-        if line['banned_at_utc'] is None and line['banned_by'] is None:
-            return None
-    if table_name == 'removed':
-        if line['removal_reason'] is None and line['removed_by'] is None:
-            return None
-    if table_name == 'wiki':
-        dt = datetime.fromisoformat(line['revision_date'].replace("Z", "+00:00"))
-        epoch_time = int(dt.timestamp())
-        line['revision_date'] = epoch_time
-        pattern = r"/r/([^/]+)"
-        subreddit_match = re.search(pattern, text)
-        if not subreddit_match:  # If the subreddit could not be found then return None since this data will be useless
-            return None
-        line['subreddit'] = subreddit_match.group(1)
 
-    if table_name == 'post':  # To not get any postgreSQL errors
-        if int(line['edited']) == 0:
-            line['edited'] = False
-        else:
-            line['edited'] = True
+    cleaned_data = dict()
+    for table in tables:
+        cleaned_data[table] = None
 
-    cleaned_line = {key: line[key] for key in items_to_keep if key in line}
+    for table in tables:
+        line = line_input
+        items_to_keep = table_columns[table]
+        if table in 'banned':
+            if line['banned_at_utc'] is None and line['banned_by'] is None:
+                continue
+        if table == 'removed':
+            if line['removal_reason'] is None and line['removed_by'] is None:
+                continue
+        if table == 'wiki':
+            dt = datetime.fromisoformat(line['revision_date'].replace("Z", "+00:00"))
+            epoch_time = int(dt.timestamp())
+            line['revision_date'] = epoch_time
+            pattern = r"/r/([^/]+)"
+            subreddit_match = re.search(pattern, text)
+            if not subreddit_match:  # If the subreddit could not be found then return None since this data will be useless
+                continue
+            line['subreddit'] = subreddit_match.group(1)
 
-    return cleaned_line
+        if table == 'post':  # To not get any postgreSQL errors
+            if int(line['edited']) == 0:
+                line['edited'] = False
+            else:
+                line['edited'] = True
 
-def process_cleaned_lines(cleaned_lines, table) -> pd.DataFrame:
-    df_processed = pd.DataFrame(cleaned_lines)
-    if len(df_processed) == 0 or df_processed is None:
-        return pd.DataFrame()
+        if table == 'author':
+            if line['author'] in ignored_author_names:
+                continue
 
-    primary_key_column = get_primary_key(table)
-    columns = df_processed.columns.tolist()
-    for pm in primary_key_column:
-        if pm not in columns:
-            return pd.DataFrame()
-    df_processed = df_processed.drop_duplicates(subset=primary_key_column)
-    df_processed = df_processed.map(lambda x: str(x) if isinstance(x, (list, dict)) else x)
+        cleaned_line = {key: line[key] for key in items_to_keep if key in line}
+        cleaned_data[table] = cleaned_line
 
-    return df_processed
+    return cleaned_data
+
+def process_cleaned_lines(cleaned_lines_dct) -> dict[str, pd.DataFrame]:
+
+    for table_name, data in cleaned_lines_dct.items():
+        if data is None:
+            continue
+
+        cleaned_lines_dct[table_name] = pd.DataFrame(data)
+        if len(cleaned_lines_dct[table_name]) == 0:
+            cleaned_lines_dct[table_name] = None
+            continue
+
+        primary_key_column = get_primary_key(table_name)
+        columns = cleaned_lines_dct[table_name].columns.tolist()
+        for pm in primary_key_column:
+            if pm not in columns:
+                cleaned_lines_dct[table_name] = None
+                continue
+        cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].drop_duplicates(subset=primary_key_column)
+        cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].map(lambda x: str(x) if isinstance(x, (list, dict)) else x)
+
+    return cleaned_lines_dct
 
 
 sql_count = 0
 
-def process_table(data_file, table, conn, chunk_size=10_000):
+def process_table(data_file, tables, conn, table_columns, ignored_author_names, chunk_size=10_000):
     global sql_count
 
     added_count = 0
-    for df_chunk in extract_lines(data_file, table, chunk_size):
-        if not df_chunk.empty:
-            write_to_db(df_chunk, table, conn, chunk_size=chunk_size)
-            added_count += 1
+    for chunk_data in extract_lines(data_file, tables, table_columns, ignored_author_names, chunk_size):
+        for table_name, data in chunk_data.items():
+            if data is not None and not data.empty:
+                write_to_db(data, table_name, conn, len(chunk_data), chunk_size=chunk_size)
+                added_count += 1
     sql_count = 0  # Reset count for the progress bar
     if added_count == 0:
-        print(f'Error! All chunks of {table} were empty')
+        print(f'Error! All chunks of {tables} were empty')
 
 
-def extract_lines(data_file, table, chunk_size=10_000) -> pd.DataFrame:
+def extract_lines(data_file, tables, table_columns, ignored_author_names, chunk_size=10_000) -> dict[str, pd.DataFrame]:
     global progress_bar
-    lines_clean = []
+    lines_clean = {}
+    for table_name in tables:
+        lines_clean[table_name] = []
+
 
     total_lines = get_line_count_file(data_file)
-    time.sleep(0.2)
-    progress_bar = tqdm(total=total_lines, desc=f"Processing {table}", unit_scale=True)
+    progress_bar = tqdm(total=total_lines, desc=f"Processing {len(tables)} tables: {tables} (from {data_file.split('/')[-1]})")
 
-    ignored_author_names = set()
-    with open('ignored.txt', 'r', encoding='utf-8') as ignored:
-        for ignored_name in ignored:
-            ignored_author_names.add(ignored_name.strip())
-
-    line_count = 0
+    lines_cleaned_count = 0
     with open(data_file, 'r', encoding='utf-8') as f_data:
 
         for line in f_data:
-            cleaned_line = clean_line(line, table)
-            if table == 'author':
-                if cleaned_line['author'] in ignored_author_names:
-                    continue
-            lines_clean.append(cleaned_line)
-            line_count += 1
+            cleaned_data = clean_line(line, tables, table_columns, ignored_author_names)
+            for table_name, line_cleaned in cleaned_data.items():
+                if line_cleaned is not None:
+                    lines_clean[table_name].append(line_cleaned)
+
+            lines_cleaned_count += 1
             progress_bar.update(1)
 
-            if len(lines_clean) >= chunk_size:
-                yield process_cleaned_lines(lines_clean, table)
-                lines_clean = []
-            if line_count >= LINES_SUBSET:
+            if lines_cleaned_count % chunk_size == 0 and lines_cleaned_count > 0:
+                yield process_cleaned_lines(lines_clean)
+                # Clean the dict for the next iteration
+                lines_clean = dict()
+                for table_name in tables:
+                    lines_clean[table_name] = []
+            if lines_cleaned_count >= LINES_SUBSET:
                 break
 
     progress_bar.close()
     if lines_clean:
-        yield process_cleaned_lines(lines_clean, table)
+        yield process_cleaned_lines(lines_clean)
 
 
-def write_to_db(df, table, conn, chunk_size=10_000):
+def write_to_db(df, table, conn, len_tables, chunk_size=10_000):
     global sql_count, progress_bar
     df.to_sql(table, conn, if_exists="append", index=False, chunksize=5000)
     sql_count += 1
-    progress_bar.set_postfix_str(f'[{sql_count}/{math.ceil(progress_bar.total / chunk_size)} SQL writes]')
+    progress_bar.set_postfix_str(f'[{sql_count}/{math.ceil(progress_bar.total / chunk_size * len_tables):,} SQL writes]')
 
 
-def is_file_table_added_db(data_file, table, db_info_file):
+def is_file_tables_added_db(data_file, table, db_info_file):
     if os.path.isfile(db_info_file):
         with open(db_info_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         for obj in data:
             if obj['file'] == data_file:
-                if table in obj['success_tables']:
+                if set(table) == set(obj['success_tables']):
                     return True
     return False
 
 
-def add_file_table_db_info(subset_file, table, db_info_file):
+def add_file_table_db_info(subset_file, tables, db_info_file):
     if not os.path.isfile(db_info_file):
         with open(db_info_file, 'w', encoding='utf-8') as f:
             json.dump([], f, indent=4)
@@ -169,11 +198,11 @@ def add_file_table_db_info(subset_file, table, db_info_file):
     file_entry = next((obj for obj in data if obj['file'] == subset_file), None)
 
     if file_entry:
-        if table not in file_entry['success_tables']:
-            file_entry['success_tables'].append(table)
+        if tables not in file_entry['success_tables']:
+            file_entry['success_tables'].extend(tables)
             file_entry['success_tables'] = list(set(file_entry['success_tables']))
     else:
-        data.append({'file': subset_file, 'success_tables': [table]})
+        data.append({'file': subset_file, 'success_tables': [tables]})
 
     with open(db_info_file, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4)
@@ -200,6 +229,7 @@ def remove_duplicates_db(conn):
 
 
 def delete_table_db(table_name, engine):
+    print(f'Deleting table {table_name}...')
     if isinstance(engine, sqlite3.Connection):
         engine.execute(f"DROP TABLE IF EXISTS {table_name}")
         print(f'Deleted table {table_name} in SQLITE database')
@@ -250,19 +280,30 @@ def process_data_without_filter(conn):
             delete_table_db(table, conn)
 
     new_data_added = False
+    table_columns = dict()
 
+    # Preparing data
     for file in data_files:
-        for table in data_files_tables[file]:
-            if table in ['banned']:
-                continue
-            if is_file_table_added_db(file, table, db_info_file):
-                continue
-            process_table(file, table, conn)
-            add_file_table_db_info(file, table, db_info_file)
-            new_data_added = True
+        tables = data_files_tables[file]
+        for table in tables:
+            table_columns[table] = get_table_columns(sql_file_path='db_structure.sql', table_name=table)
+
+    ignored_author_names = set()
+    with open('ignored.txt', 'r', encoding='utf-8') as ignored:
+        for ignored_name in ignored:
+            ignored_author_names.add(ignored_name.strip())
+
+    # Add the data to the SQL database
+    for file in data_files:
+        tables = data_files_tables[file]
+        if is_file_tables_added_db(file, tables, db_info_file):
+            continue
+        process_table(file, tables, conn, table_columns, ignored_author_names)
+        add_file_table_db_info(file, tables, db_info_file)
+        new_data_added = True
 
 
     if not new_data_added:
         print('No new data was added. Removing duplicates...')
-        time.sleep(0.2)  # Wait a bit so print does not interfere with the tqdm progress bar of removing duplicates
+        time.sleep(0.1)  # Wait a bit so print does not interfere with the tqdm progress bar of removing duplicates
     remove_duplicates_db(conn)

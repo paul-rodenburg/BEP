@@ -18,7 +18,6 @@ from config import posts_subset_base_name, LINES_SUBSET, comments_subset_file, r
 import sqlite3
 import re
 
-tqdm.format_sizeof = lambda x, divisor=None: f"{x:,}" if divisor else f"{x:5.2f}"
 progress_bar = None
 clean_errors = 0
 
@@ -121,7 +120,7 @@ def extract_lines(line_file, content_file, table, wiki=False, chunk_size=10_000)
 
     total_lines = get_line_count_file(line_file)
     time.sleep(0.2)
-    progress_bar = tqdm(total=total_lines, desc=f"Processing {table}", unit_scale=True)
+    progress_bar = tqdm(total=total_lines, desc=f"Processing {table}")
 
     ignored_author_names = set()
     with open('ignored.txt', 'r', encoding='utf-8') as ignored:
@@ -217,6 +216,7 @@ def remove_duplicates_db(conn):
 
 
 def delete_table_db(table_name, engine):
+    print(f'Deleting table {table_name}...')
     if isinstance(engine, sqlite3.Connection):
         engine.execute(f"DROP TABLE IF EXISTS {table_name}")
         print(f'Deleted table {table_name} in SQLITE database')

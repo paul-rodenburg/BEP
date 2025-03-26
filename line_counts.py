@@ -20,11 +20,9 @@ def get_line_count_file(file_path: str):
     Get the line count of a file. If the file is cached and the MD5 hash is correct,
     return the cached line count. If not, compute the line count, hash, and update the cache.
 
-    Args:
-    - file_path (str): Path to the file.
+    :param file_path: Path to the file
 
-    Returns:
-    - int: Line count of the file.
+    :return: Line count of the file.
     """
     # Load cached data
     cached_data = {entry["path"]: entry for entry in load_cached_data()}
@@ -36,12 +34,9 @@ def get_line_count_file(file_path: str):
 
         # If hash matches, return the cached line count
         if file_hash == cached_hash:
-            print(f"Using cached line count for {file_path}")
             return cached_data[file_path]["line_count"]
 
     # If no cache or hash mismatch, compute line count and hash
-    print(f"Computing line count for {file_path}")
-    time.sleep(0.2)  # Wait a bit so print dont interfere with tqdm progress bars
     line_count = count_lines_in_file(file_path)  # Replace with actual line count function
     file_hash, hash_method = compute_md5(file_path)  # Compute file hash
 
