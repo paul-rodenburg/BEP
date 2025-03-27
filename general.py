@@ -1,9 +1,8 @@
-from sqlalchemy.dialects.postgresql.pg_catalog import pg_get_serial_sequence
-import threading
 import sqlite3
-import os
 import re
 from collections import deque
+from config import *
+import os
 
 def extract_line(line_nr, content_file_path):
     line_nr = int(line_nr)
@@ -156,3 +155,16 @@ def read_file_reverse(file_path):
             if lines:
                 for line in reversed(lines):
                     yield line  # Yield lines in reverse order
+
+
+
+def check_files():
+    files = [comments_file, posts_2025_1_file, subreddit_rules_file, subreddit_wiki_file, subreddits_file, subreddits_metadata_file]
+    files_not_found = []
+    for file in files:
+        if not os.path.isfile(file):
+            files_not_found.append(file)
+
+    if files_not_found:
+        file_not_found_text = "\n".join(files_not_found)
+        raise FileNotFoundError(f"The following files were not found:\n{file_not_found_text}")
