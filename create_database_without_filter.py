@@ -4,7 +4,7 @@ import json
 import os
 import time
 import math
-
+from itertools import chain
 from pandas.core.internals.construction import dataclasses_to_dicts
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
@@ -111,8 +111,9 @@ def process_cleaned_lines(cleaned_lines_dct) -> dict[str, pd.DataFrame]:
             if pm not in columns:
                 cleaned_lines_dct[table_name] = None
                 continue
-        cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].drop_duplicates(subset=primary_key_column)
-        cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].map(lambda x: str(x) if isinstance(x, (list, dict)) else x)
+        if cleaned_lines_dct[table_name] is not None and not cleaned_lines_dct[table_name].empty:
+            cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].drop_duplicates(subset=primary_key_column)
+            cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].map(lambda x: str(x) if isinstance(x, (list, dict)) else x)
 
     return cleaned_lines_dct
 
@@ -199,7 +200,8 @@ def add_file_table_db_info(subset_file, tables, db_info_file):
 
     if file_entry:
         if tables not in file_entry['success_tables']:
-            file_entry['success_tables'].extend(tables)
+            file_entry['success_tables'].append(tables)
+            file_entry['success_tables'] = list(chain.from_iterable(file_entry['success_tables']))
             file_entry['success_tables'] = list(set(file_entry['success_tables']))
     else:
         data.append({'file': subset_file, 'success_tables': [tables]})
