@@ -160,7 +160,7 @@ def write_to_db(df, table, conn, chunk_size=10_000):
     global sql_count, progress_bar
     df.to_sql(table, conn, if_exists="append", index=False, chunksize=5000)
     sql_count += 1
-    progress_bar.set_postfix_str(f'[{sql_count}/{math.ceil(progress_bar.total / chunk_size)} SQL writes]')
+    progress_bar.set_postfix_str(f'[{sql_count:,}/{math.ceil(progress_bar.total / chunk_size):,} SQL writes]')
 
 
 def is_file_table_added_db(subset_file, table, db_info_file):

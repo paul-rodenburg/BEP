@@ -5,7 +5,6 @@ import os
 import time
 import math
 from itertools import chain
-from pandas.core.internals.construction import dataclasses_to_dicts
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 from tqdm import tqdm
@@ -86,7 +85,7 @@ def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[
                 line['edited'] = True
 
         if table == 'author':
-            if line['author'] in ignored_author_names:
+            if line['author'].strip().lower() in ignored_author_names:
                 continue
 
         cleaned_line = {key: line[key] for key in items_to_keep if key in line}
@@ -101,7 +100,7 @@ def process_cleaned_lines(cleaned_lines_dct) -> dict[str, pd.DataFrame]:
             continue
 
         cleaned_lines_dct[table_name] = pd.DataFrame(data)
-        if len(cleaned_lines_dct[table_name]) == 0:
+        if len(cleaned_lines_dct[table_name]) == 0 or cleaned_lines_dct[table_name] is None:
             cleaned_lines_dct[table_name] = None
             continue
 
@@ -141,8 +140,8 @@ def extract_lines(data_file, tables, table_columns, ignored_author_names, chunk_
         lines_clean[table_name] = []
 
 
-    total_lines = get_line_count_file(data_file)
-    progress_bar = tqdm(total=total_lines, desc=f"Processing {len(tables)} tables: {tables} (from {data_file.split('/')[-1]})")
+    progress_bar_total = min(get_line_count_file(data_file), LINES_SUBSET)
+    progress_bar = tqdm(total=progress_bar_total, desc=f"Processing {len(tables)} table(s): {tables} (from {data_file.split('/')[-1]})")
 
     lines_cleaned_count = 0
     with open(data_file, 'r', encoding='utf-8') as f_data:
@@ -174,18 +173,22 @@ def write_to_db(df, table, conn, len_tables, chunk_size=10_000):
     global sql_count, progress_bar
     df.to_sql(table, conn, if_exists="append", index=False, chunksize=5000)
     sql_count += 1
-    progress_bar.set_postfix_str(f'[{sql_count}/{math.ceil(progress_bar.total / chunk_size * len_tables):,} SQL writes]')
+    progress_bar.set_postfix_str(f'[{sql_count:,}/{math.ceil(progress_bar.total / chunk_size * len_tables):,} SQL writes]')
 
 
-def is_file_tables_added_db(data_file, table, db_info_file):
+def is_file_tables_added_db(data_file, tables, db_info_file) -> list:
     if os.path.isfile(db_info_file):
         with open(db_info_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
+
         for obj in data:
             if obj['file'] == data_file:
-                if set(table) == set(obj['success_tables']):
-                    return True
-    return False
+                # Find tables that are in `tables` but not in `success_tables`
+                missing_tables = list(set(tables) - set(obj['success_tables']))
+                return missing_tables
+
+    # If file doesn't exist or file not found, return all tables
+    return tables
 
 
 def add_file_table_db_info(subset_file, tables, db_info_file):
@@ -199,12 +202,12 @@ def add_file_table_db_info(subset_file, tables, db_info_file):
     file_entry = next((obj for obj in data if obj['file'] == subset_file), None)
 
     if file_entry:
-        if tables not in file_entry['success_tables']:
+        if not all(item in file_entry['success_tables'] for item in tables):
             file_entry['success_tables'].append(tables)
             file_entry['success_tables'] = list(chain.from_iterable(file_entry['success_tables']))
             file_entry['success_tables'] = list(set(file_entry['success_tables']))
     else:
-        data.append({'file': subset_file, 'success_tables': [tables]})
+        data.append({'file': subset_file, 'success_tables': tables})
 
     with open(db_info_file, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4)
@@ -231,7 +234,16 @@ def remove_duplicates_db(conn):
 
 
 def delete_table_db(table_name, engine):
-    print(f'Deleting table {table_name}...')
+    delete_confirm = input(f'Deleting table {table_name}... Sure? (y/n)')
+    if delete_confirm.lower().strip() == 'y':
+        pass
+    elif delete_confirm.lower().strip() == 'n':
+        return
+    else:
+        print(f'{delete_confirm} is not a valid option. Please try again.')
+        delete_table_db(table_name, engine)
+        return
+
     if isinstance(engine, sqlite3.Connection):
         engine.execute(f"DROP TABLE IF EXISTS {table_name}")
         print(f'Deleted table {table_name} in SQLITE database')
@@ -293,16 +305,16 @@ def process_data_without_filter(conn):
     ignored_author_names = set()
     with open('ignored.txt', 'r', encoding='utf-8') as ignored:
         for ignored_name in ignored:
-            ignored_author_names.add(ignored_name.strip())
+            ignored_author_names.add(ignored_name.strip().lower())
 
     # Add the data to the SQL database
     for file in data_files:
         tables = data_files_tables[file]
-        if is_file_tables_added_db(file, tables, db_info_file):
-            continue
-        process_table(file, tables, conn, table_columns, ignored_author_names)
-        add_file_table_db_info(file, tables, db_info_file)
-        new_data_added = True
+        tables_to_process = is_file_tables_added_db(file, tables, db_info_file)
+        if tables_to_process:
+            process_table(file, tables_to_process, conn, table_columns, ignored_author_names)
+            add_file_table_db_info(file, tables_to_process, db_info_file)
+            new_data_added = True
 
 
     if not new_data_added:

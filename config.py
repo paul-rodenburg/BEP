@@ -1,6 +1,6 @@
 # Config
 # Number of lines/comments/posts in the subset (_ for better readability)
-LINES_SUBSET = 40_000_000
+LINES_SUBSET = 80_000_000
 
 posts_subset_base_name = 'data/subset/subset_posts'
 comments_subset_file = 'data/subset/subset_comments'
