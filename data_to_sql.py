@@ -246,7 +246,7 @@ def process_data(conn):
     if isinstance(conn, sqlite3.Connection):  # SQLite connection
         db_info_file = 'databases/db_info_sqlite.json'
     elif isinstance(conn, Engine):  # PostgreSQL connection
-        db_info_file = 'databases/db_info_post.json'
+        db_info_file = 'databases/db_info_postgresql.json'
     else:
         raise ValueError(f'Only SQLite and Postgres connections are supported, not {type(conn)}')
 
