@@ -57,3 +57,10 @@ subset_to_original = {comments_subset_file: comments_file,
                       rules_subset_file: subreddit_rules_file,
                       wikis_subset_file: subreddit_wiki_file,
                       subreddits_subset_file: subreddits_file}
+
+data_files_tables_mongo = {posts_2025_1_file: 'post',
+                     comments_file: 'comment',
+                     subreddit_rules_file: 'subreddit_rules',
+                     subreddit_wiki_file: 'wiki',
+                     subreddits_file: 'subreddit',
+                     subreddits_metadata_file: 'subreddit_metadata'}

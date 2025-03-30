@@ -145,6 +145,7 @@ def process_cleaned_lines(cleaned_lines_dct) -> dict[str, pd.DataFrame]:
         if cleaned_lines_dct[table_name] is not None and not cleaned_lines_dct[table_name].empty:
             cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].drop_duplicates(subset=primary_key_column)
             cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].map(lambda x: str(x) if isinstance(x, (list, dict)) else x)
+            cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].map(lambda x: x.replace("\x00", "") if isinstance(x, str) else x)
 
     return cleaned_lines_dct
 
