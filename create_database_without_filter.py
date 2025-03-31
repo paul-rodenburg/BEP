@@ -459,15 +459,19 @@ def set_index(conn, table_name):
 
     :raises ValueError: if the connection type is not supported
     """
-    pm = get_primary_key(table_name)
+    pms = get_primary_key(table_name)
+
+    print(f"Setting index for table '{table_name}' and columns {pms}...")
     if isinstance(conn, sqlite3.Connection):  # SQLite connection
         cur = conn.cursor()
-        cur.execute(f"CREATE INDEX index_{pm} ON {table_name} ({pm});")
+        for pm in pms:
+            cur.execute(f"CREATE INDEX index_{pm} ON {table_name} ({pm});")
     elif isinstance(conn, Engine):  # PostgreSQL connection
         with conn.connect() as engine:
-            engine.execute(f"CREATE INDEX index_{pm} ON {table_name} ({pm});")
+            for pm in pms:
+                engine.execute(text(f"CREATE INDEX IF NOT EXISTS index_{pm} ON {table_name} ({pm});"))
     else:
-        raise ValueError(f'{mode} is not supported')
+        raise ValueError(f'{type(conn)} is not supported')
 
 def process_data_without_filter(conn):
     """
@@ -518,6 +522,7 @@ def process_data_without_filter(conn):
     # Add the data to the SQL database
     for file in data_files:
         tables = data_files_tables[file]
+
         tables_to_process = is_file_tables_added_db(file, tables, db_info_file)
         if tables_to_process:
             process_table(file, tables_to_process, conn, table_columns, ignored_author_names)

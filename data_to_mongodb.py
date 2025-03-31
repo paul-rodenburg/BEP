@@ -26,7 +26,6 @@ if __name__ == "__main__":
                 print(f"Skipping collection '{collection_name}'.")
                 continue  # Skip to next iteration if user says no
 
-
         # Configurable chunk size for batch insertion
         CHUNK_SIZE = 1000  # Adjust as needed
 
@@ -37,10 +36,11 @@ if __name__ == "__main__":
         # Open NDJSON file and insert in chunks
         with open(data_file, "r", encoding="utf-8") as file:
             buffer = []
-            total_lines = get_line_count_file(data_file)
-
+            total_lines = min(get_line_count_file(data_file), LINES_SUBSET)
+            line_count = 0
             with tqdm(total=total_lines, desc=f"Importing {collection_name} data to MongoDB collection {collection_name}", unit="docs") as pbar:
                 for line in file:
+                    line_count += 1
                     if line.strip():  # Ignore empty lines
                         buffer.append(json.loads(line))
 
@@ -48,6 +48,13 @@ if __name__ == "__main__":
                         collection.insert_many(buffer)
                         pbar.update(len(buffer))
                         buffer.clear()  # Clear buffer after inserting
+
+                    if line_count >= LINES_SUBSET:  # Stop if there are LINES_SUBSET written to avoid a very very large db
+                        if buffer:
+                            collection.insert_many(buffer)
+                            pbar.update(len(buffer))
+                            buffer.clear()  # Clear memory
+                        break
 
                 # Insert any remaining documents
                 if buffer:
