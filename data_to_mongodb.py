@@ -6,29 +6,6 @@ from general import get_primary_key
 from line_counts import get_line_count_file
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-def get_collection_count(collection_to_count):
-    """
-    Gets the collection count with a timeout of 5 seconds.
-
-    :param collection_to_count: MongoDB collection
-    :return: docs count in collection or None if timeout occurs or an error happens
-    """
-    def count_docs():
-        return collection_to_count.count_documents({})
-
-    try:
-        # Create a thread pool to run the count_docs function with a timeout
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(count_docs)  # Start counting in a separate thread
-            count_result = future.result(timeout=5)  # Wait for the result with a 5-second timeout
-            return count_result
-    except TimeoutError:
-        print(f"Timeout: Counting documents in collection '{collection_to_count.name}' took too long.")
-        return None
-    except Exception as e:
-        print(f"Error while getting count for collection {collection_to_count.name}: {e}")
-        return None
-
 if __name__ == "__main__":
     # MongoDB Connection
     client = pymongo.MongoClient("mongodb://localhost:27017/")
@@ -39,12 +16,8 @@ if __name__ == "__main__":
 
         # Check if collection exists
         if collection_name in db.list_collection_names():
-            count = get_collection_count(collection)
 
-            if count is not None:
-                response = input(f"Collection '{collection_name}' already exists with {count} documents. Remove it? (y/n): ")
-            else:
-                response = input(f"Collection '{collection_name}' already exists. Remove it? (y/n): ")
+            response = input(f"Collection '{collection_name}' already exists. Remove it? (y/n): ")
 
             if response == "y":
                 collection.drop()  # Remove collection
@@ -58,13 +31,13 @@ if __name__ == "__main__":
         CHUNK_SIZE = 1000  # Adjust as needed
 
         # Add index
-        pm = get_primary_key(collection_name)
+        pm = get_primary_key(collection_name)[0]
         collection.create_index([(pm, pymongo.ASCENDING)])
 
         # Open NDJSON file and insert in chunks
         with open(data_file, "r", encoding="utf-8") as file:
             buffer = []
-            total_lines = get_line_count_file(posts_2025_1_file)
+            total_lines = get_line_count_file(data_file)
 
             with tqdm(total=total_lines, desc=f"Importing {collection_name} data to MongoDB collection {collection_name}", unit="docs") as pbar:
                 for line in file:
