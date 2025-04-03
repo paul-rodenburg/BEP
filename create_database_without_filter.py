@@ -546,6 +546,12 @@ def process_data_without_filter(conn):
 
     clean_json_duplicates(db_info_file)
 
+    # Modify table schema here (for example, to change 'selftext' column to TEXT)
+    if db_type == 'mysql' or db_type == 'postgresql':
+        with conn.connect() as engine:
+            engine.execute(text("ALTER TABLE post MODIFY COLUMN selftext TEXT;"))
+            print("Table 'post' modified: 'selftext' column changed to TEXT.")
+
     for table in get_tables(conn):
         delete_table = True
         with open(db_info_file, 'r', encoding='utf-8') as f:
