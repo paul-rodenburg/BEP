@@ -1,10 +1,14 @@
 from datetime import datetime
+from unittest import case
+
 import pandas as pd
 import json
 import os
 import time
 import math
 from itertools import chain
+
+from annotated_types.test_cases import cases
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 from tqdm import tqdm
@@ -419,28 +423,21 @@ def delete_table_db(table_name, engine):
         delete_table_db(table_name, engine)
         return
 
-    if isinstance(engine, sqlite3.Connection):  # SQLite connection
-        engine.execute(f"DROP TABLE IF EXISTS {table_name}")
-        print(f'Deleted table {table_name} in SQLITE database')
-
-    elif isinstance(engine, Engine):  # PostgreSQL or MySQL connection
-        db_type = engine.dialect.name  # Detect the database type
-
-        if db_type == "postgresql":  # PostgreSQL
-            with engine.connect() as conn:
-                conn.execute(text(f"DROP TABLE IF EXISTS {table_name} CASCADE"))
-            print(f'Deleted table {table_name} in PostgreSQL database')
-
-        elif db_type == "mysql":  # MySQL
+    db_type = get_database_type(engine)
+    match db_type:
+        case 'sqlite':
+            engine.execute(f"DROP TABLE IF EXISTS {table_name}")
+            print(f'Deleted table {table_name} in SQLITE database')
+        case 'mysql':
             with engine.connect() as conn:
                 conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
             print(f'Deleted table {table_name} in MySQL database')
-
-        else:
-            raise ValueError(f"Unsupported database type: {db_type}")
-
-    else:
-        raise ValueError(f'{type(engine)} is not supported')
+        case 'postgresql':
+            with engine.connect() as conn:
+                conn.execute(text(f"DROP TABLE IF EXISTS {table_name} CASCADE"))
+            print(f'Deleted table {table_name} in PostgreSQL database')
+        case _:
+            raise ValueError(f'Unknown database type: {db_type}')
 
 
 def get_tables(engine):
@@ -451,28 +448,23 @@ def get_tables(engine):
 
     :raises ValueError: if the connection type is not supported
     """
-    # Establish a connection from the SQLAlchemy engine
-    if isinstance(engine, sqlite3.Connection):  # SQLite
-        result = engine.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = result.fetchall()
-        return [table[0] for table in tables]
-
-    elif isinstance(engine, Engine):  # PostgreSQL or MySQL
-        with engine.connect() as conn:
-            # Check the dialect to determine the database type
-            db_type = engine.dialect.name
-
-            if db_type == "postgresql":  # PostgreSQL
-                result = conn.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public';"))
-            elif db_type == "mysql":  # MySQL
+    db_type = get_database_type(engine)
+    match db_type:
+        case 'sqlite':
+            result = engine.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = result.fetchall()
+            return [table[0] for table in tables]
+        case 'mysql':
+            with engine.connect() as conn:
                 result = conn.execute(text("SHOW TABLES"))
-            else:
-                raise ValueError(f"Unsupported database type: {db_type}")
-
             return [row[0] for row in result.fetchall()]
+        case 'postgresql':
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public';"))
+            return [row[0] for row in result.fetchall()]
+        case _:
+            raise ValueError(f'Unknown database type: {db_type}')
 
-    else:
-        raise ValueError(f"Unsupported engine type: {type(engine)}")
 
 def set_index(conn, table_name):
     """
@@ -487,24 +479,47 @@ def set_index(conn, table_name):
 
     print(f"Setting index for table '{table_name}' and columns {pms}...")
 
+    db_type = get_database_type(conn)
+    for pm in pms:
+        match db_type:
+            case 'sqlite':
+                cur = conn.cursor()
+                cur.execute(f"CREATE INDEX IF NOT EXISTS index_{pm} ON {table_name} ({pm});")
+                cur.close()
+            case 'mysql':
+                with conn.connect() as engine:
+                    engine.execute(text(f"CREATE INDEX IF NOT EXISTS index_{pm} ON {table_name} ({pm});"))
+            case 'postgresql':
+                with conn.connect() as engine:
+                    engine.execute(text(f"CREATE INDEX IF NOT EXISTS index_{pm} ON {table_name} ({pm});"))
+            case _:
+                raise ValueError(f'Unknown database type: {db_type}')
+
+
+def get_database_type(conn) -> str:
+    """
+    Gets the database type based on the connection.
+
+    :param conn: connection to the database
+    :raises ValueError: if the connection type is not supported
+    :return: the database type ('postgresql' or 'mysql' or 'sqlite')
+    """
     if isinstance(conn, sqlite3.Connection):  # SQLite
-        cur = conn.cursor()
-        for pm in pms:
-            cur.execute(f"CREATE INDEX IF NOT EXISTS index_{pm} ON {table_name} ({pm});")
+        return 'sqlite'
 
     elif isinstance(conn, Engine):  # PostgreSQL or MySQL
-        db_type = conn.dialect.name  # Detect the database type
-        with conn.connect() as engine:
-            for pm in pms:
-                if db_type == "postgresql":  # PostgreSQL
-                    engine.execute(text(f"CREATE INDEX IF NOT EXISTS index_{pm} ON {table_name} ({pm});"))
-                elif db_type == "mysql":  # MySQL
-                    engine.execute(text(f"CREATE INDEX IF NOT EXISTS index_{pm} ON {table_name} ({pm});"))
-                else:
-                    raise ValueError(f"Unsupported database type for indexing: {db_type}")
+        db_type = conn.dialect.name  # Detect database type
+        match db_type:
+            case 'postgresql':
+                return 'postgresql'
+            case 'mysql':
+                return 'mysql'
+            case _:
+                raise ValueError(f"Only SQLite, PostgreSQL, and MySQL connections are supported, not {db_type}")
 
     else:
-        raise ValueError(f"Unsupported connection type: {type(conn)}")
+        raise ValueError(f"Only SQLite, PostgreSQL, and MySQL connections are supported, not {type(conn)}")
+
 
 def process_data_without_filter(conn):
     """
@@ -512,23 +527,16 @@ def process_data_without_filter(conn):
 
     :param conn: connection to the database
     """
-    if isinstance(conn, sqlite3.Connection):  # SQLite
-        db_info_file = 'databases/db_info_sqlite_ALL.json'
-
-    elif isinstance(conn, Engine):  # PostgreSQL or MySQL
-        db_type = conn.dialect.name  # Detect database type
-
-        if db_type == "postgresql":  # PostgreSQL
+    db_type = get_database_type(conn)
+    match db_type:
+        case 'sqlite':
+            db_info_file = 'databases/db_info_sqlite_ALL.json'
+        case 'postgresql':
             db_info_file = 'databases/db_info_postgresql_ALL.json'
-
-        elif db_type == "mysql":  # MySQL
+        case 'mysql':
             db_info_file = 'databases/db_info_mysql_ALL.json'
-
-        else:
-            raise ValueError(f"Unsupported database type: {db_type}")
-
-    else:
-        raise ValueError(f"Only SQLite, PostgreSQL, and MySQL connections are supported, not {type(conn)}")
+        case _:
+            raise ValueError(f'Unknown database type: {db_type}')
 
     print(f'Only adding new data. To rebuild existing tables, remove them from the {db_info_file} file')
 
