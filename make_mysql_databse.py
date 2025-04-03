@@ -9,7 +9,13 @@ os.makedirs('databases', exist_ok=True)
 # Connect to MySQL
 host = 'localhost'
 user = 'root'
-engine = create_engine(f"mysql+pymysql://{user}@{host}")
+password = 'admin'
+if password is not None:
+    engine_url = f"mysql+pymysql://{user}:{password}@{host}"
+else:
+    engine_url = f"mysql+pymysql://{user}@{host}"
+
+engine = create_engine(engine_url)
 
 check_files()
 all_subset_input = input('Do you want to create a database from all lines in a ndjson file or from subsets? all [a] subsets [s]')
@@ -21,7 +27,7 @@ if all_subset_input == 'a':
         conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {DB_NAME}"))
         conn.commit()
 
-    engine = create_engine(f"mysql+pymysql://{user}@{host}/{DB_NAME}")
+    engine = create_engine(f'{engine_url}/{DB_NAME}')
     process_data_without_filter(engine)
 elif all_subset_input == 's':
     DB_NAME = "reddit_data"
@@ -30,7 +36,7 @@ elif all_subset_input == 's':
     with engine.connect() as conn:
         conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {DB_NAME}"))
         conn.commit()
-    engine = create_engine(f"mysql+pymysql://{user}@{host}/{DB_NAME}")
+    engine = create_engine(f'{engine_url}/{DB_NAME}')
     process_data(engine)
 else:
     print(f'{all_subset_input} is not a valid option. Please try again.')
