@@ -114,6 +114,8 @@ def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[
             else:
                 line['edited'] = True
 
+        if table == 'post':
+            line['selftext'] = line['selftext'][:500]
         if table == 'author':
             if line['author'].strip().lower() in ignored_author_names:
                 continue
@@ -521,6 +523,44 @@ def get_database_type(conn) -> str:
         raise ValueError(f"Only SQLite, PostgreSQL, and MySQL connections are supported, not {type(conn)}")
 
 
+def create_tables_from_sql(conn):
+    """
+    Creates tables in the database from the provided .sql file.
+
+    :param conn: Connection object (sqlite3, SQLAlchemy engine).
+    """
+    db_type = get_database_type(conn)
+    print('create_tables_from_sql needs implementation.')
+    return
+
+    # Check the database type and execute schema creation accordingly
+    match db_type:
+        case 'sqlite':
+            schema_path = 'schemas/sqlite_schema.sql'
+            with open(schema_path, 'r') as file:
+                schema_sql = file.read()
+            conn.executescript(schema_sql)
+            print("Schema (tables) created successfully for SQLite.")
+        case 'postgresql':
+            schema_path = 'schemas/postgresql_schema.sql'
+            with open(schema_path, 'r') as file:
+                schema_sql = file.read()
+
+            with conn.connect() as connection:
+                connection.execute(text(schema_sql))
+            print("Schema (tables) created successfully for PostgreSQL/MySQL.")
+        case 'mysql':
+            schema_path = 'schemas/mysql_schema.sql'
+            with open(schema_path, 'r') as file:
+                schema_sql = file.read()
+
+            with conn.connect() as connection:
+                connection.execute(text(schema_sql))
+            print("Schema (tables) created successfully for PostgreSQL/MySQL.")
+        case _:
+            raise ValueError(f"Unsupported database type ({db_type}). Choose 'sqlite', 'postgresql', or 'mysql'.")
+
+
 def process_data_without_filter(conn):
     """
     Adds the reddit data to a database (sqlite or postgresql) without selecting specific lines, it just adds all the data.
@@ -547,10 +587,10 @@ def process_data_without_filter(conn):
     clean_json_duplicates(db_info_file)
 
     # Modify table schema here (for example, to change 'selftext' column to TEXT)
-    if db_type == 'mysql' or db_type == 'postgresql':
-        with conn.connect() as engine:
-            engine.execute(text("ALTER TABLE post MODIFY COLUMN selftext TEXT;"))
-            print("Table 'post' modified: 'selftext' column changed to TEXT.")
+    # if db_type == 'mysql' or db_type == 'postgresql':
+    #     with conn.connect() as engine:
+    #         engine.execute(text("ALTER TABLE post MODIFY COLUMN selftext TEXT;"))
+    #         print("Table 'post' modified: 'selftext' column changed to TEXT.")
 
     for table in get_tables(conn):
         delete_table = True
@@ -566,6 +606,7 @@ def process_data_without_filter(conn):
     new_data_added = False
     table_columns = dict()
 
+    create_tables_from_sql(conn)
     # Preparing data
     for file in data_files:
         tables = data_files_tables[file]
