@@ -619,11 +619,6 @@ def process_data_without_filter(conn):
         for table in tables:
             table_columns[table] = get_table_columns(sql_file_path='db_structure.sql', table_name=table)
 
-    # ----------------------
-    set_index(conn, 'post')
-    set_index(conn, 'author')
-    # ----------------------
-
     ignored_author_names = set()
     with open('ignored.txt', 'r', encoding='utf-8') as ignored:
         for ignored_name in ignored:
