@@ -490,7 +490,13 @@ def set_index(conn, table_name):
                 cur.close()
             case 'mysql':
                 with conn.connect() as engine:
-                    engine.execute(text(f"CREATE INDEX IF NOT EXISTS index_{pm} ON {table_name} ({pm});"))
+                    index_check = text(f"SHOW INDEX FROM {table_name} WHERE Key_name = 'index_{pm}'")
+                    result = engine.execute(index_check).fetchone()
+
+                    if not result:  # If index does not exist, create it
+                        create_index_query = text(f"CREATE INDEX index_{pm} ON {table_name} ({pm}(255));")
+                        engine.execute(create_index_query)
+                        engine.commit()
             case 'postgresql':
                 with conn.connect() as engine:
                     engine.execute(text(f"CREATE INDEX IF NOT EXISTS index_{pm} ON {table_name} ({pm});"))
@@ -530,7 +536,7 @@ def create_tables_from_sql(conn):
     :param conn: Connection object (sqlite3, SQLAlchemy engine).
     """
     db_type = get_database_type(conn)
-    print('create_tables_from_sql needs implementation.')
+    print("\033[91mcreate_tables_from_sql needs implementation.\033[0m")
     return
 
     # Check the database type and execute schema creation accordingly
@@ -612,6 +618,11 @@ def process_data_without_filter(conn):
         tables = data_files_tables[file]
         for table in tables:
             table_columns[table] = get_table_columns(sql_file_path='db_structure.sql', table_name=table)
+
+    # ----------------------
+    set_index(conn, 'post')
+    set_index(conn, 'author')
+    # ----------------------
 
     ignored_author_names = set()
     with open('ignored.txt', 'r', encoding='utf-8') as ignored:
