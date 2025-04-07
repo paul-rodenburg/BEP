@@ -12,8 +12,21 @@
 6. Move the uncompressed files to the `data` folder and specify its locations in `config.py`
 
 
-## Run scripts
-[process here]
+## Steps to make database(s)
+
+1. Install the database drivers:
+   - MySQL [Download MySQL drivers](https://dev.mysql.com/downloads/installer/)
+     - For macOS: first install [HomeBrew](https://brew.sh/) and then run `brew install mysql` in the terminal
+   - PostgreSQL [Download PostgreSQL drivers](https://www.postgresql.org/download/)
+   - MongoDB [Download MongoDB drivers](https://www.mongodb.com/docs/manual/administration/install-community/)
+   - No driver installation for sqlite is necessary
+2. Run the following files in the folder `data_to_db` to make the databases
+   - `make_mysql_database.py`
+   - `make_postgresql_database.py`
+   - `make_mongdb_database.py`
+   - `make_sqlite_database.py`
+
+[other steps will be added later]
 
 ## Sources
 

@@ -1,25 +1,19 @@
 from datetime import datetime
-from unittest import case
-
 import pandas as pd
 import json
 import os
 import time
 import math
 from itertools import chain
-
-from annotated_types.test_cases import cases
-from sqlalchemy.engine import Engine
 from sqlalchemy import text
 from tqdm import tqdm
-from general import get_primary_key
+from general import get_primary_key, get_tables_database, get_database_type
 from line_counts import get_line_count_file
-from config import *
-import sqlite3
 import re
 
 progress_bar = None
 clean_errors = 0
+maximum_rows_database = 0
 
 def unnest(lst):
     """
@@ -107,6 +101,7 @@ def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[
             if not subreddit_match:  # If the subreddit could not be found then return None since this data will be useless
                 continue
             line['subreddit'] = subreddit_match.group(1)
+            line['content'] = line['content'][:500]
 
         if table == 'post' or table == 'comment':  # To not get any postgreSQL errors
             if int(line['edited']) == 0:
@@ -200,7 +195,7 @@ def extract_lines(data_file, tables, table_columns, ignored_author_names, chunk_
         lines_clean[table_name] = []
 
 
-    progress_bar_total = min(get_line_count_file(data_file), LINES_SUBSET)
+    progress_bar_total = min(get_line_count_file(data_file), maximum_rows_database)
     progress_bar = tqdm(total=progress_bar_total, desc=f"Processing {len(tables)} table(s): {tables} (from {data_file.split('/')[-1]})")
 
     lines_cleaned_count = 0
@@ -221,7 +216,7 @@ def extract_lines(data_file, tables, table_columns, ignored_author_names, chunk_
                 lines_clean = dict()
                 for table_name in tables:
                     lines_clean[table_name] = []
-            if lines_cleaned_count >= LINES_SUBSET:
+            if lines_cleaned_count >= maximum_rows_database:
                 break
 
     progress_bar.close()
@@ -442,35 +437,47 @@ def delete_table_db(table_name, engine):
             raise ValueError(f'Unknown database type: {db_type}')
 
 
-def get_tables(engine):
+def table_exists(engine, table_name, db_type):
     """
-    Gets the tables of a database.
+    Checks if a table exists in the database.
 
     :param engine: connection to the database
+    :param table_name: name of the table
+    :param db_type: database type
 
-    :raises ValueError: if the connection type is not supported
+    :raises ValueError: if the database type is not supported
+
+    :return: True if the table exists, False otherwise
     """
-    db_type = get_database_type(engine)
-    match db_type:
-        case 'sqlite':
-            result = engine.execute("SELECT name FROM sqlite_master WHERE type='table';")
-            tables = result.fetchall()
-            return [table[0] for table in tables]
-        case 'mysql':
-            with engine.connect() as conn:
-                result = conn.execute(text("SHOW TABLES"))
-            return [row[0] for row in result.fetchall()]
-        case 'postgresql':
-            with engine.connect() as conn:
-                result = conn.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public';"))
-            return [row[0] for row in result.fetchall()]
-        case _:
-            raise ValueError(f'Unknown database type: {db_type}')
+    if db_type == 'mysql':
+        query = text(f"SHOW TABLES LIKE :table")
+        result = engine.execute(query, {'table': table_name}).fetchone()
+        return result is not None
+
+    elif db_type == 'postgresql':
+        query = text(f"""
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_name = :table
+            )
+        """)
+        result = engine.execute(query, {'table': table_name}).fetchone()
+        return result[0]
+
+    elif db_type == 'sqlite':
+        query = text(f"SELECT name FROM sqlite_master WHERE type='table' AND name=:table")
+        result = engine.execute(query, {'table': table_name}).fetchone()
+        return result is not None
+
+    else:
+        raise ValueError(f'Unknown database type: {db_type}')
 
 
 def set_index(conn, table_name):
     """
-    Sets the index of a database table, this ensures efficient lookups.
+    Sets the index of a database table, ensuring efficient lookups.
+    If the index already exists, it will be recreated.
 
     :param conn: connection to the database
     :param table_name: the name of the table you want to set the index for
@@ -478,55 +485,68 @@ def set_index(conn, table_name):
     :raises ValueError: if the connection type is not supported
     """
     pms = get_primary_key(table_name)
+    db_type = get_database_type(conn)
 
     print(f"Setting index for table '{table_name}' and columns {pms}...")
 
-    db_type = get_database_type(conn)
     for pm in pms:
-        match db_type:
-            case 'sqlite':
-                cur = conn.cursor()
-                cur.execute(f"CREATE INDEX IF NOT EXISTS index_{pm} ON {table_name} ({pm});")
-                cur.close()
-            case 'mysql':
-                with conn.connect() as engine:
-                    index_check = text(f"SHOW INDEX FROM {table_name} WHERE Key_name = 'index_{pm}'")
-                    result = engine.execute(index_check).fetchone()
+        if db_type == 'sqlite':
+            # SQLite doesn't use 'connect()', just use the provided 'conn'
+            with conn:
+                # Drop the index if it already exists
+                conn.execute(f"DROP INDEX IF EXISTS index_{pm}")
+                # Create the index
+                conn.execute(f"CREATE INDEX index_{pm} ON {table_name} ({pm})")
 
-                    if not result:  # If index does not exist, create it
-                        create_index_query = text(f"CREATE INDEX index_{pm} ON {table_name} ({pm}(255));")
-                        engine.execute(create_index_query)
-                        engine.commit()
-            case 'postgresql':
-                with conn.connect() as engine:
-                    engine.execute(text(f"CREATE INDEX IF NOT EXISTS index_{pm} ON {table_name} ({pm});"))
-            case _:
-                raise ValueError(f'Unknown database type: {db_type}')
+        elif db_type == 'mysql':
+            with conn.connect() as engine:
+                # Check if the table exists
+                if not table_exists(engine, table_name, db_type):
+                    print(f"Table '{table_name}' does not exist. Skipping index creation.")
+                    return
 
+                # Check if the index exists
+                index_check_query = text(f"""
+                    SELECT 1 FROM information_schema.statistics
+                    WHERE table_name = :table_name AND index_name = :index_name
+                """)
+                result = engine.execute(index_check_query,
+                                        {'table_name': table_name, 'index_name': f'index_{pm}'}).fetchone()
 
-def get_database_type(conn) -> str:
-    """
-    Gets the database type based on the connection.
+                # Drop the index if it exists
+                if result:
+                    drop_index_query = text(f"DROP INDEX index_{pm} ON {table_name}")
+                    engine.execute(drop_index_query)
 
-    :param conn: connection to the database
-    :raises ValueError: if the connection type is not supported
-    :return: the database type ('postgresql' or 'mysql' or 'sqlite')
-    """
-    if isinstance(conn, sqlite3.Connection):  # SQLite
-        return 'sqlite'
+                # Check if the column is of type TEXT or BLOB
+                column_type_query = text(f"""
+                    SELECT COLUMN_TYPE
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = :table_name AND COLUMN_NAME = :column_name
+                """)
+                column_type = engine.execute(column_type_query,
+                                             {'table_name': table_name, 'column_name': pm}).fetchone()
 
-    elif isinstance(conn, Engine):  # PostgreSQL or MySQL
-        db_type = conn.dialect.name  # Detect database type
-        match db_type:
-            case 'postgresql':
-                return 'postgresql'
-            case 'mysql':
-                return 'mysql'
-            case _:
-                raise ValueError(f"Only SQLite, PostgreSQL, and MySQL connections are supported, not {db_type}")
+                # If the column is TEXT or BLOB, we need to specify the length for the index
+                if column_type and ('text' in column_type[0].lower() or 'blob' in column_type[0].lower()):
+                    create_index_query = text(f"CREATE INDEX index_{pm} ON {table_name} ({pm}(255))")
+                else:
+                    create_index_query = text(f"CREATE INDEX index_{pm} ON {table_name} ({pm})")
 
-    else:
-        raise ValueError(f"Only SQLite, PostgreSQL, and MySQL connections are supported, not {type(conn)}")
+                # Create the index
+                engine.execute(create_index_query)
+                engine.commit()
+
+        elif db_type == 'postgresql':
+            with conn.connect() as engine:
+                # Drop the index if it already exists
+                engine.execute(text(f"DROP INDEX IF EXISTS index_{pm}"))
+                # Create the index
+                engine.execute(text(f"CREATE INDEX index_{pm} ON {table_name} ({pm})"))
+                engine.commit()
+
+        else:
+            raise ValueError(f'Unknown database type: {db_type}')
 
 
 def create_tables_from_sql(conn):
@@ -567,7 +587,9 @@ def create_tables_from_sql(conn):
             raise ValueError(f"Unsupported database type ({db_type}). Choose 'sqlite', 'postgresql', or 'mysql'.")
 
 
-def process_data_without_filter(conn):
+def generate_sql_database(conn):
+    global maximum_rows_database
+
     """
     Adds the reddit data to a database (sqlite or postgresql) without selecting specific lines, it just adds all the data.
 
@@ -598,7 +620,7 @@ def process_data_without_filter(conn):
     #         engine.execute(text("ALTER TABLE post MODIFY COLUMN selftext TEXT;"))
     #         print("Table 'post' modified: 'selftext' column changed to TEXT.")
 
-    for table in get_tables(conn):
+    for table in get_tables_database(conn):
         delete_table = True
         with open(db_info_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -612,12 +634,20 @@ def process_data_without_filter(conn):
     new_data_added = False
     table_columns = dict()
 
+    # Load config
+    with open('config.json', 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        data_files = list(data['data_files_tables'].keys())
+        data_files_tables = data['data_files_tables']
+        maximum_rows_database = data['maximum_rows_database']
+
+
     create_tables_from_sql(conn)
     # Preparing data
     for file in data_files:
-        tables = data_files_tables[file]
+        tables = data_files_tables[file]['sql']
         for table in tables:
-            table_columns[table] = get_table_columns(sql_file_path='db_structure.sql', table_name=table)
+            table_columns[table] = get_table_columns(sql_file_path='schemas/sqlite_schema.sql', table_name=table)
 
     ignored_author_names = set()
     with open('ignored.txt', 'r', encoding='utf-8') as ignored:
@@ -626,7 +656,7 @@ def process_data_without_filter(conn):
 
     # Add the data to the SQL database
     for file in data_files:
-        tables = data_files_tables[file]
+        tables = data_files_tables[file]['sql']
 
         tables_to_process = is_file_tables_added_db(file, tables, db_info_file)
         if tables_to_process:

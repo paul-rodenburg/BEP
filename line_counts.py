@@ -6,7 +6,7 @@ import os
 from tqdm import tqdm
 
 CACHE_FILE = "cache/file_counts.json"
-os.makedirs('cache', exist_ok=True)
+# os.makedirs('cache', exist_ok=True)
 
 
 def count_lines_in_file(file_path):
