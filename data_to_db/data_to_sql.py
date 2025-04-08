@@ -414,7 +414,7 @@ def delete_table_db(table_name, engine):
     if delete_confirm.lower().strip() == 'y':
         pass
     elif delete_confirm.lower().strip() == 'n':
-        return
+        return True
     else:
         print(f'{delete_confirm} is not a valid option. Please try again.')
         delete_table_db(table_name, engine)
@@ -620,6 +620,8 @@ def generate_sql_database(conn):
     #         engine.execute(text("ALTER TABLE post MODIFY COLUMN selftext TEXT;"))
     #         print("Table 'post' modified: 'selftext' column changed to TEXT.")
 
+    tables_exist_skip = set()
+
     for table in get_tables_database(conn):
         delete_table = True
         with open(db_info_file, 'r', encoding='utf-8') as f:
@@ -629,7 +631,10 @@ def generate_sql_database(conn):
                 delete_table = False
                 break
         if delete_table:
-            delete_table_db(table, conn)
+            result_delete = delete_table_db(table, conn)
+            if result_delete:
+                tables_exist_skip.add(table)
+                print(f'Skipping table {table}')
 
     new_data_added = False
     table_columns = dict()
@@ -659,6 +664,7 @@ def generate_sql_database(conn):
         tables = data_files_tables[file]['sql']
 
         tables_to_process = is_file_tables_added_db(file, tables, db_info_file)
+        tables_to_process = list(set(tables_to_process) - tables_exist_skip)
         if tables_to_process:
             process_table(file, tables_to_process, conn, table_columns, ignored_author_names)
             add_file_table_db_info(file, tables_to_process, db_info_file)
