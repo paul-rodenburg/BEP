@@ -1,0 +1,103 @@
+{
+  "mysql": {
+    "username": "root",
+    "password": null,
+    "host": "localhost",
+    "custom_engine_url": null
+  },
+  "sqlite": {
+    "db_location_relative": "databases/reddit_data_ALL.db"
+  },
+  "postgresql": {
+    "username": "postgres",
+    "password": "admin",
+    "host": "localhost",
+    "port": "5432",
+    "db_name": "reddit_data_ALL",
+    "custom_engine_url": null
+  },
+  "mongodb": {
+    "host": "localhost",
+    "port": "27017",
+    "db_name": "reddit_data",
+    "custom_engine_url": null
+  },
+  "maximum_rows_database": 80000000,
+  "dates_data_files_process_order": [
+    "2025-1",
+    "2024-12",
+    "2025-2",
+    "2024-11",
+    "2024-10",
+    "2024-09"
+  ],
+  "data_files": {
+    "post_files": {
+      "posts_2025_1_file": {
+        "date": "2025-1",
+        "file_path": "data/submissions/RS_2025-01/RS_2025-01"
+      },
+      "posts_2025_2_file": {
+        "date": "2025-2",
+        "file_path": "data/submissions/RS_2025-02/RS_2025-02"
+      },
+      "posts_2024_12_file": {
+        "date": "2024-12",
+        "file_path": "data/submissions/RS_2024-12/RS_2024-12"
+      },
+      "posts_2024_11_file": {
+        "date": "2024-11",
+        "file_path": "data/submissions/RS_2024-11/RS_2024-11"
+      },
+      "posts_2024_10_file": {
+        "date": "2024-10",
+        "file_path": "data/submissions/RS_2024-10/RS_2024-10"
+      },
+      "posts_2024_09_file": {
+        "date": "2024-09",
+        "file_path": "data/submissions/RS_2024-10/RS_2024-09"
+      }
+    },
+    "comments_files": {
+      "comments_2025_1": "data/comments/RC_2025-01/RC_2025-01"
+    },
+    "subreddit_files": {
+      "subreddit_rules_file": "data/subreddits/subreddit_rules_2025-01/subreddit_rules_2025-01",
+      "subreddit_wiki_file": "data/subreddits/subreddit_wikis_2025-01/subreddit_wikis_2025-01",
+      "subreddits_file": "data/subreddits/subreddits_2025-01/subreddits_2025-01",
+      "subreddits_metadata_file": "data/subreddits/subreddits_meta_only_2025-01/subreddits_meta_only_2025-01"
+    }
+  },
+  "data_files_tables": {
+    "data/submissions/RS_2025-01/RS_2025-01": {
+      "sql": ["post", "author", "banned"],
+      "mongodb": "post"
+    },
+    "data/comments/RC_2025-01/RC_2025-01": {
+      "sql": ["comment"],
+      "mongodb": "comment"
+    },
+    "data/subreddits/subreddit_rules_2025-01/subreddit_rules_2025-01": {
+      "sql": ["subreddit_rules"],
+      "mongodb": "subreddit_rules"
+    },
+    "data/subreddits/subreddit_wikis_2025-01/subreddit_wikis_2025-01": {
+      "sql": ["wiki", "revision_wiki"],
+      "mongodb": "wiki"
+    },
+    "data/subreddits/subreddits_2025-01/subreddits_2025-01": {
+      "sql": [
+        "subreddit",
+        "subreddit_settings",
+        "subreddit_media",
+        "subreddit_permissions",
+        "subreddit_comment_media"
+      ],
+      "mongodb": "subreddit"
+    },
+    "data/subreddits/subreddits_meta_only_2025-01/subreddits_meta_only_2025-01": {
+      "sql": ["subreddit_metadata"],
+      "mongodb": "subreddit_metadata"
+    }
+  }
+}

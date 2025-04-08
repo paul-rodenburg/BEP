@@ -1,10 +1,10 @@
 /data
 /cache
+/databases
 .idea
 *.pyc
 /.ipynb_checkpoints
 *.db
 /__pycache__
-*.json
 */.DS_Store
 .DS_Store
