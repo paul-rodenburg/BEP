@@ -1,5 +1,5 @@
-import sqlite3
 import json
+from sqlalchemy import create_engine
 from data_to_sql import generate_sql_database
 import os
 from general import check_files
@@ -18,5 +18,5 @@ with open('config.json', 'r', encoding='utf-8') as f:
 
 check_files()
 
-conn = sqlite3.connect(db_location_relative)
-generate_sql_database(conn)
+engine = create_engine(f'sqlite:///{db_location_relative}')
+generate_sql_database(engine)

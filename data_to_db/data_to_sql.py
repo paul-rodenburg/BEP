@@ -2,13 +2,13 @@ from datetime import datetime
 import pandas as pd
 import json
 import os
-import time
 import math
 from itertools import chain
 from sqlalchemy import text
 from tqdm import tqdm
 from general import get_primary_key, get_tables_database, get_database_type
 from line_counts import get_line_count_file
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import re
 
 progress_bar = None
@@ -28,42 +28,48 @@ def unnest(lst):
     return list(chain.from_iterable(lst))
 
 
-def get_table_columns(sql_file_path, table_name) -> list:
+def get_table_columns(json_schema_path, table_name) -> list:
     """
     Gets the table columns from a sqlite database file.
 
-    :param sql_file_path: Path to the sqlite database file.
+    :param json_schema_path: Path to the json schema file.
     :param table_name: Name of the table to extract columns from.
 
     :return: list of table names in the sqlite database file.
     """
-    with open(sql_file_path, "r", encoding="utf-8") as f:
-        sql = f.read()
-
-    # Regular expression to extract the table definition
-    table_pattern = rf"CREATE TABLE `{table_name}` \((.*?)\);"
-    match = re.search(table_pattern, sql, re.S)
-
-    if not match:
-        return []
-
-    # Extracting column definitions
-    columns_block = match.group(1)
-
-    # Regular expression to extract column names
-    column_pattern = r"`(\w+)`"
-    columns = re.findall(column_pattern, columns_block)
-
+    with open(json_schema_path, "r", encoding="utf-8") as f:
+        schema = json.load(f)
+    columns = list(schema[table_name]['columns'].keys())
     return columns
 
-def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[str, dict]:
+
+def process_line_rules(line: dict) -> list[dict]:
+    """
+    Helper method to process a line for the subreddit_rules table. Unpacks the rule dictionary.
+
+    :param line: Line to process.
+
+    :return: list of dictionaries, each containing one rule
+    """
+    lines_rules_cleaned = []
+    subreddit = line["subreddit"]
+    for rule in line["rules"]:
+        rule_id = f'{subreddit}_{rule["priority"]}'
+        rule = {"rule_id": rule_id, **rule}  # Ensure rule_id the first item (just for better visibility when viewing the database)
+        rule['subreddit'] = subreddit
+        lines_rules_cleaned.append(rule)
+
+    return lines_rules_cleaned
+
+
+def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[str, list[dict]]:
     """
     Gets a line and cleans it for all the tables.
 
     :param line_input: line to clean
     :param tables: tables for the line
     :param table_columns: columns for the tables
-    :param ignored_author_names: author names to ignore.
+    :param ignored_author_names: author names to ignore
     :return: A dict with as key the table name and value the cleaned line for that table
     """
     global clean_errors
@@ -81,6 +87,8 @@ def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[
     for table in tables:
         line = line_input
         items_to_keep = table_columns[table]
+        if table == 'subreddit_rules':
+            line = process_line_rules(line)
         if table in 'banned':
             if line['banned_at_utc'] is None and line['banned_by'] is None:
                 continue
@@ -115,40 +123,65 @@ def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[
             if line['author'].strip().lower() in ignored_author_names:
                 continue
 
-        cleaned_line = {key: line[key] for key in items_to_keep if key in line}
-        cleaned_data[table] = cleaned_line
+        if not isinstance(line, list):
+            line = [line]
 
+        cleaned_lines = []
+        for l in line:
+            l = {key: l[key] for key in items_to_keep if key in l}
+            cleaned_lines.append(l)
+
+        cleaned_data[table] = cleaned_lines
     return cleaned_data
 
+seen_keys = {}
+
 def process_cleaned_lines(cleaned_lines_dct) -> dict[str, pd.DataFrame]:
+    global seen_keys
+
     """
-    Puts the list of cleaned lines into a dataframe, which is then put into the value of a dictionary with as key the table name.
+    Converts cleaned line entries to DataFrames, ensuring only globally unique rows based on primary keys.
 
     :param cleaned_lines_dct: cleaned lines dictionary
-
-    :return: A dict with as key the table name and value the cleaned lines in a pandas DataFrame.
+    :param seen_keys: Optional dict to track already seen primary key combinations per table
+    :return: A dict with the table name as key and a deduplicated DataFrame as value.
     """
     for table_name, data in cleaned_lines_dct.items():
-        if data is None:
-            continue
-
-        cleaned_lines_dct[table_name] = pd.DataFrame(data)
-        if len(cleaned_lines_dct[table_name]) == 0 or cleaned_lines_dct[table_name] is None:
+        if not data:
             cleaned_lines_dct[table_name] = None
             continue
 
         primary_key_column = get_primary_key(table_name)
-        columns = cleaned_lines_dct[table_name].columns.tolist()
-        for pm in primary_key_column:
-            if pm not in columns:
-                cleaned_lines_dct[table_name] = None
-                continue
-        if cleaned_lines_dct[table_name] is not None and not cleaned_lines_dct[table_name].empty:
-            cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].drop_duplicates(subset=primary_key_column)
-            cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].map(lambda x: str(x) if isinstance(x, (list, dict)) else x)
-            cleaned_lines_dct[table_name] = cleaned_lines_dct[table_name].map(lambda x: x.replace("\x00", "") if isinstance(x, str) else x)
+        if not primary_key_column:
+            cleaned_lines_dct[table_name] = None
+            continue
+
+        if table_name not in seen_keys:
+            seen_keys[table_name] = set()
+
+        unique_rows = []
+        for row in data:
+            key = tuple(row.get(pm) for pm in primary_key_column)
+            if None in key:
+                continue  # skip incomplete primary keys
+            if key not in seen_keys[table_name]:
+                seen_keys[table_name].add(key)
+                unique_rows.append(row)
+
+        if not unique_rows:
+            cleaned_lines_dct[table_name] = None
+            continue
+
+        df = pd.DataFrame(unique_rows)
+
+        # clean up weird data types and null characters
+        df = df.map(lambda x: str(x) if isinstance(x, (list, dict)) else x)
+        df = df.map(lambda x: x.replace("\x00", "") if isinstance(x, str) else x)
+
+        cleaned_lines_dct[table_name] = df
 
     return cleaned_lines_dct
+
 
 
 sql_count = 0
@@ -203,9 +236,9 @@ def extract_lines(data_file, tables, table_columns, ignored_author_names, chunk_
 
         for line in f_data:
             cleaned_data = clean_line(line, tables, table_columns, ignored_author_names)
-            for table_name, line_cleaned in cleaned_data.items():
-                if line_cleaned is not None:
-                    lines_clean[table_name].append(line_cleaned)
+            for table_name, lines_cleaned in cleaned_data.items():
+                if lines_cleaned is not None:
+                    lines_clean[table_name].extend(lines_cleaned)
 
             lines_cleaned_count += 1
             progress_bar.update(1)
@@ -349,44 +382,6 @@ def update_json_with_table_duplicates(json_file, table_name, data_file):
     with open(json_file, "w") as f:
         json.dump(json_data, f, indent=2)
 
-
-def remove_duplicates_db(conn, json_file):
-    """
-    Removes duplicate tables from a database.
-
-    :param conn: connection to database
-    :param json_file: path to json file with database specific info
-    """
-    print("\033[91mREMOVING DUPLICATES TAKES TOO MUCH RAM! NEEDS BETTER IMPLEMENTATION\033[0m")
-    return
-    cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = [table[0] for table in cursor.fetchall()]
-
-    json_data = load_json(json_file)
-    tables_to_skip = get_tables_to_skip(json_data)
-    tables_to_skip.update(['comment', 'post'])  # There will never be duplicates in post and comment tables
-
-    progress_bar_duplicates_removed = tqdm(total=len(set(tables) - tables_to_skip), desc='Removing duplicates from database')
-    for table_name in tables:
-        data_file = get_data_file(data_files_tables, table_name)
-        if table_name in tables_to_skip:
-            continue
-        progress_bar_duplicates_removed.update()
-        progress_bar_duplicates_removed.set_postfix_str(f"Currently at '{table_name}'")
-        q = f'SELECT * FROM {table_name}'
-        df_clean = pd.read_sql_query(q, conn)
-
-        try:
-            df_clean = df_clean.drop_duplicates(subset=get_primary_key(table_name))
-        except Exception as e:
-            print(f'Error with table {table_name} and primary key {get_primary_key(table_name)}: {e}')
-            continue
-
-        df_clean.to_sql(table_name, conn, if_exists='replace', index=False)
-        df_clean = pd.DataFrame()
-        update_json_with_table_duplicates(json_file, table_name, data_file)
-
 def clean_json_duplicates(json_file):
     """
     Cleans the json duplicates field, ensures that a table name is only in the duplicates_removed field if in success_tables.
@@ -403,27 +398,29 @@ def clean_json_duplicates(json_file):
 
 def delete_table_db(table_name, engine):
     """
-    Deletes a table from the database.
+    If a table exists, asks the user to delete it. If the table does not exist, noting is done.
 
     :param table_name: name of the table to delete
     :param engine: connection to the database
 
     :raises ValueError: if the connection type is not supported
     """
-    delete_confirm = input(f'Deleting table {table_name}... Sure? (y/n)')
-    if delete_confirm.lower().strip() == 'y':
-        pass
-    elif delete_confirm.lower().strip() == 'n':
-        return True
-    else:
-        print(f'{delete_confirm} is not a valid option. Please try again.')
-        delete_table_db(table_name, engine)
-        return
-
     db_type = get_database_type(engine)
+
+    with engine.connect() as conn:
+        if table_exists(conn, table_name, db_type):
+            delete_confirm = input(
+                f'Table {table_name} already exists. Delete anyway? (y/n)')
+            if delete_confirm.lower().strip() != 'y':
+                return True
+        else:  # Table does not exist
+            return
+
+
     match db_type:
         case 'sqlite':
-            engine.execute(f"DROP TABLE IF EXISTS {table_name}")
+            with engine.connect() as conn:
+                conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
             print(f'Deleted table {table_name} in SQLITE database')
         case 'mysql':
             with engine.connect() as conn:
@@ -449,6 +446,7 @@ def table_exists(engine, table_name, db_type):
 
     :return: True if the table exists, False otherwise
     """
+
     if db_type == 'mysql':
         query = text(f"SHOW TABLES LIKE :table")
         result = engine.execute(query, {'table': table_name}).fetchone()
@@ -492,11 +490,11 @@ def set_index(conn, table_name):
     for pm in pms:
         if db_type == 'sqlite':
             # SQLite doesn't use 'connect()', just use the provided 'conn'
-            with conn:
+            with conn.connect() as engine:
                 # Drop the index if it already exists
-                conn.execute(f"DROP INDEX IF EXISTS index_{pm}")
+                engine.execute(text(f"DROP INDEX IF EXISTS index_{pm}"))
                 # Create the index
-                conn.execute(f"CREATE INDEX index_{pm} ON {table_name} ({pm})")
+                engine.execute(text(f"CREATE INDEX index_{pm} ON {table_name} ({pm})"))
 
         elif db_type == 'mysql':
             with conn.connect() as engine:
@@ -548,43 +546,72 @@ def set_index(conn, table_name):
         else:
             raise ValueError(f'Unknown database type: {db_type}')
 
-
-def create_tables_from_sql(conn):
+def generate_create_table_statement(table_name, schema_json_file) -> str:
     """
-    Creates tables in the database from the provided .sql file.
+    Makes the CREATE TABLE statements from the json schema file.
 
-    :param conn: Connection object (sqlite3, SQLAlchemy engine).
+    :param schema_json_file: json schema file
+    :param table_name: name of the table
+
+    :return: CREATE TABLE statement
+    """
+    with open(schema_json_file, 'r') as f:
+        schema = json.load(f)
+
+    if table_name not in schema:
+        raise ValueError(f"Table '{table_name}' not found in the schema.")
+
+    table = schema[table_name]
+    columns = table["columns"]
+    primary_keys = table.get("primary_key", [])
+
+    lines = []
+    for col_name, col_type in columns.items():
+        # Don't add PRIMARY KEY here if there are multiple keys
+        line = f'  "{col_name}" {col_type}'
+        if isinstance(primary_keys, list) and len(primary_keys) == 1 and col_name in primary_keys:
+            line += " PRIMARY KEY"
+        lines.append(line)
+
+    # Add composite PRIMARY KEY constraint if needed
+    if isinstance(primary_keys, list) and len(primary_keys) > 1:
+        primary_keys_alt = [f'"{pk}"' for pk in primary_keys]
+        pks_text = ", ".join(primary_keys_alt)
+        pk_line = f'  PRIMARY KEY ({pks_text})'
+        lines.append(pk_line)
+
+    column_definitions = ",\n".join(lines)
+    create_stmt = f'CREATE TABLE "{table_name}" (\n{column_definitions}\n);'
+
+    return create_stmt
+
+def create_tables_from_sql(conn, schema_json_file='schemas/db_schema.json'):
+    """
+    Creates tables in the database from the provided json schema file,
+    only if they don't already exist.
+
+    :param conn: SQLAlchemy engine or sqlite3 connection.
+    :param schema_json_file: path to the schema json file
     """
     db_type = get_database_type(conn)
-    print("\033[91mcreate_tables_from_sql needs implementation.\033[0m")
-    return
+    with open(schema_json_file, 'r', encoding='utf-8') as f:
+        schema = json.load(f)
 
-    # Check the database type and execute schema creation accordingly
-    match db_type:
-        case 'sqlite':
-            schema_path = 'schemas/sqlite_schema.sql'
-            with open(schema_path, 'r') as file:
-                schema_sql = file.read()
-            conn.executescript(schema_sql)
-            print("Schema (tables) created successfully for SQLite.")
-        case 'postgresql':
-            schema_path = 'schemas/postgresql_schema.sql'
-            with open(schema_path, 'r') as file:
-                schema_sql = file.read()
+    tables = list(schema.keys())
 
-            with conn.connect() as connection:
-                connection.execute(text(schema_sql))
-            print("Schema (tables) created successfully for PostgreSQL/MySQL.")
-        case 'mysql':
-            schema_path = 'schemas/mysql_schema.sql'
-            with open(schema_path, 'r') as file:
-                schema_sql = file.read()
+    with conn.connect() as connection:
+        for table_name in tables:
+            if table_exists(connection, table_name, db_type):
+                # print(f"Skipping existing table: {table_name}")
+                continue
 
-            with conn.connect() as connection:
-                connection.execute(text(schema_sql))
-            print("Schema (tables) created successfully for PostgreSQL/MySQL.")
-        case _:
-            raise ValueError(f"Unsupported database type ({db_type}). Choose 'sqlite', 'postgresql', or 'mysql'.")
+            try:
+                create_table_statement = generate_create_table_statement(table_name, schema_json_file)
+                connection.execute(text(create_table_statement))
+                print(f"Created table: {table_name}")
+            except Exception as e:
+                print(f"Error creating table {table_name}: {e}")
+                print(generate_create_table_statement(table_name, schema_json_file))
 
 
 def generate_sql_database(conn):
@@ -614,12 +641,6 @@ def generate_sql_database(conn):
 
     clean_json_duplicates(db_info_file)
 
-    # Modify table schema here (for example, to change 'selftext' column to TEXT)
-    # if db_type == 'mysql' or db_type == 'postgresql':
-    #     with conn.connect() as engine:
-    #         engine.execute(text("ALTER TABLE post MODIFY COLUMN selftext TEXT;"))
-    #         print("Table 'post' modified: 'selftext' column changed to TEXT.")
-
     tables_exist_skip = set()
 
     for table in get_tables_database(conn):
@@ -636,7 +657,6 @@ def generate_sql_database(conn):
                 tables_exist_skip.add(table)
                 print(f'Skipping table {table}')
 
-    new_data_added = False
     table_columns = dict()
 
     # Load config
@@ -652,7 +672,7 @@ def generate_sql_database(conn):
     for file in data_files:
         tables = data_files_tables[file]['sql']
         for table in tables:
-            table_columns[table] = get_table_columns(sql_file_path='schemas/sqlite_schema.sql', table_name=table)
+            table_columns[table] = get_table_columns(json_schema_path='schemas/db_schema.json', table_name=table)
 
     ignored_author_names = set()
     with open('ignored.txt', 'r', encoding='utf-8') as ignored:
@@ -668,11 +688,6 @@ def generate_sql_database(conn):
         if tables_to_process:
             process_table(file, tables_to_process, conn, table_columns, ignored_author_names)
             add_file_table_db_info(file, tables_to_process, db_info_file)
-            new_data_added = True
             for table in tables_to_process:
                 set_index(conn, table)
 
-    if not new_data_added:
-        print('No new data was added. Removing duplicates...')
-        time.sleep(0.1)  # Wait a bit so print does not interfere with the tqdm progress bar of removing duplicate
-    remove_duplicates_db(conn, db_info_file)

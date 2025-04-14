@@ -1,7 +1,7 @@
 CREATE TABLE `post` (
-  `id` varchar(255) PRIMARY KEY,
-  `author_fullname` varchar(255),
-  `created_utc` timestamp,
+  `id` text PRIMARY KEY,
+  `author_fullname` text,
+  `created_utc` integer,
   `selftext` text,
   `archived` bool,
   `downs` integer,
@@ -11,40 +11,40 @@ CREATE TABLE `post` (
   `locked` bool,
   `num_comments` integer,
   `num_crossposts` integer,
-  `permalink` varchar(255),
+  `permalink` text,
   `score` integer,
   `send_replies` bool,
   `spoiler` bool,
-  `subreddit` varchar(255),
-  `thumbnail` varchar(255),
+  `subreddit` text,
+  `thumbnail` text,
   `thumbnail_height` integer,
   `thumbnail_width` integer,
-  `title` varchar(255),
+  `title` text,
   `total_awards_received` integer,
-  `top_awarded_type` varchar(255),
+  `top_awarded_type` text,
   `pinned` bool,
   `contest_mode` bool
 );
 
 CREATE TABLE `author` (
-  `author_fullname` varchar(255) PRIMARY KEY,
-  `author` varchar(255),
+  `author_fullname` text PRIMARY KEY,
+  `author` text,
   `author_premium` bool,
   `over_18` bool
 );
 
 CREATE TABLE `subreddit` (
-  `id` varchar(255) PRIMARY KEY,
-  `name` varchar(255),
-  `display_name` varchar(255),
-  `display_name_prefixed` varchar(255),
-  `title` varchar(255),
-  `description` varchar(255),
-  `public_description` varchar(255),
-  `url` varchar(255),
-  `subreddit_type` varchar(255),
-  `lang` varchar(255),
-  `created_utc` timestamp,
+  `id` text PRIMARY KEY,
+  `name` text,
+  `display_name` text,
+  `display_name_prefixed` text,
+  `title` text,
+  `description` text,
+  `public_description` text,
+  `url` text,
+  `subreddit_type` text,
+  `lang` text,
+  `created_utc` integer,
   `subscribers` integer,
   `over18` bool,
   `allow_discovery` bool,
@@ -65,35 +65,35 @@ CREATE TABLE `subreddit` (
   `spoilers_enabled` bool,
   `public_traffic` bool,
   `wiki_enabled` bool,
-  `retrieved_on` timestamp,
+  `retrieved_on` integer,
   `should_archive_posts` bool,
   `should_show_media_in_comments_setting` bool,
   `show_media` bool,
   `show_media_preview` bool,
   `user_flair_enabled_in_sr` bool,
-  `user_flair_position` varchar(255),
-  `user_flair_text` varchar(255),
-  `user_flair_type` varchar(255),
+  `user_flair_position` text,
+  `user_flair_text` text,
+  `user_flair_type` text,
   `user_sr_theme_enabled` bool,
   `videostream_links_count` integer
 );
 
 CREATE TABLE `subreddit_metadata` (
-  `display_name` varchar(255) PRIMARY KEY,
-  `earliest_comment_at` timestamp,
-  `earliest_post_at` timestamp,
+  `display_name` text PRIMARY KEY,
+  `earliest_comment_at` integer,
+  `earliest_post_at` integer,
   `num_comments` integer,
-  `num_comments_updated_at` timestamp,
+  `num_comments_updated_at` integer,
   `num_posts` integer,
-  `num_posts_updated_at` timestamp
+  `num_posts_updated_at` integer
 );
 
 CREATE TABLE `subreddit_settings` (
-  `display_name` varchar(255) PRIMARY KEY,
+  `display_name` text PRIMARY KEY,
   `accept_followers` bool,
   `accounts_active` integer,
   `accounts_active_is_fuzzed` bool,
-  `advertiser_category` varchar(255),
+  `advertiser_category` text,
   `all_original_content` bool,
   `allow_prediction_contributors` bool,
   `can_assign_link_flair` bool,
@@ -104,110 +104,110 @@ CREATE TABLE `subreddit_settings` (
   `has_menu_widget` bool,
   `original_content_tag_enabled` bool,
   `prediction_leaderboard_entry_type` integer,
-  `submission_type` varchar(255),
-  `submit_link_label` varchar(255),
-  `submit_text` varchar(255),
-  `submit_text_html` varchar(255),
-  `submit_text_label` varchar(255),
-  `suggested_comment_sort` varchar(255),
-  `notification_level` varchar(255)
+  `submission_type` text,
+  `submit_link_label` text,
+  `submit_text` text,
+  `submit_text_html` text,
+  `submit_text_label` text,
+  `suggested_comment_sort` text,
+  `notification_level` text
 );
 
 CREATE TABLE `subreddit_media` (
-  `display_name` varchar(255) PRIMARY KEY,
-  `banner_background_color` varchar(255),
-  `banner_background_image` varchar(255),
-  `banner_img` varchar(255),
-  `banner_size` varchar(255),
-  `community_icon` varchar(255),
-  `header_img` varchar(255),
-  `header_size` varchar(255),
-  `header_title` varchar(255),
-  `icon_img` varchar(255),
-  `icon_size` varchar(255),
-  `key_color` varchar(255),
-  `mobile_banner_image` varchar(255),
-  `primary_color` varchar(255)
+  `display_name` text PRIMARY KEY,
+  `banner_background_color` text,
+  `banner_background_image` text,
+  `banner_img` text,
+  `banner_size` text,
+  `community_icon` text,
+  `header_img` text,
+  `header_size` text,
+  `header_title` text,
+  `icon_img` text,
+  `icon_size` text,
+  `key_color` text,
+  `mobile_banner_image` text,
+  `primary_color` text
 );
 
 CREATE TABLE `subreddit_permissions` (
-  `display_name` varchar(255) PRIMARY KEY,
+  `display_name` text PRIMARY KEY,
   `free_form_reports` bool,
   `link_flair_enabled` bool,
-  `link_flair_position` varchar(255),
+  `link_flair_position` text,
   `user_can_flair_in_sr` bool,
-  `user_flair_background_color` varchar(255),
-  `user_flair_css_class` varchar(255),
-  `user_flair_template_id` varchar(255),
-  `user_flair_text_color` varchar(255)
+  `user_flair_background_color` text,
+  `user_flair_css_class` text,
+  `user_flair_template_id` text,
+  `user_flair_text_color` text
 );
 
 CREATE TABLE `subreddit_comment_media` (
-  `display_name` varchar(255),
-  `media_type` varchar(255),
-  PRIMARY KEY (`display_name`, `media_type`)
+  `display_name` text PRIMARY KEY,
+  `allowed_media_in_comments` text
 );
 
 CREATE TABLE `subreddit_rules` (
-  `subreddit` varchar(255) PRIMARY KEY,
-  `created_utc` timestamp,
-  `description` varchar(255),
-  `kind` varchar(255),
+  `rule_id` text PRIMARY KEY,
+  `subreddit` text,
+  `created_utc` integer,
+  `description` text,
+  `kind` text,
   `priority` integer,
-  `short_name` varchar(255),
-  `violation_reason` varchar(255)
+  `short_name` text,
+  `violation_reason` text
 );
 
 CREATE TABLE `banned` (
-  `author_fullname` varchar(255),
-  `subreddit_id` varchar(255),
-  `banned_at_utc` timestamp,
-  `banned_by` varchar(255),
+  `author_fullname` text,
+  `subreddit_id` text,
+  `banned_at_utc` integer,
+  `banned_by` text,
   PRIMARY KEY (`author_fullname`, `subreddit_id`)
 );
 
 CREATE TABLE `comment` (
-  `id` varchar(255) PRIMARY KEY,
-  `parent_id` varchar(255),
-  `body` varchar(255),
-  `author_fullname` varchar(255),
-  `created_utc` timestamp,
+  `id` text PRIMARY KEY,
+  `parent_id` text,
+  `body` text,
+  `author_fullname` text,
+  `created_utc` integer,
   `archived` bool,
   `downs` integer,
   `ups` integer,
   `edited` bool,
   `hidden` bool,
   `locked` bool,
-  `permalink` varchar(255),
-  `removal_reason` varchar(255),
-  `removed_by` varchar(255),
+  `permalink` text,
+  `removal_reason` text,
+  `removed_by` text,
   `score` integer,
   `send_replies` bool,
   `spoiler` bool,
-  `subreddit` varchar(255),
-  `thumbnail` varchar(255),
+  `subreddit` text,
+  `thumbnail` text,
   `thumbnail_height` integer,
   `thumbnail_width` integer,
-  `title` varchar(255),
+  `title` text,
   `total_awards_received` integer,
-  `top_awarded_type` varchar(255),
+  `top_awarded_type` text,
   `pinned` bool,
   `contest_mode` bool
 );
 
 CREATE TABLE `wiki` (
-  `path` varchar(255) PRIMARY KEY,
-  `subreddit` varchar(255),
-  `content` varchar(255),
-  `retrieved_on` timestamp,
+  `path` text PRIMARY KEY,
+  `subreddit` text,
+  `content` text,
+  `retrieved_on` integer,
   `revision_date` date
 );
 
 CREATE TABLE `revision_wiki` (
-  `path` varchar(255) PRIMARY KEY,
-  `revision_author` varchar(255),
-  `revision_author_id` varchar(255),
-  `revision_reason` varchar(255)
+  `path` text PRIMARY KEY,
+  `revision_author` text,
+  `revision_author_id` text,
+  `revision_reason` text
 );
 
 ALTER TABLE `post` ADD FOREIGN KEY (`author_fullname`) REFERENCES `author` (`author_fullname`);
@@ -229,17 +229,6 @@ ALTER TABLE `subreddit` ADD FOREIGN KEY (`display_name`) REFERENCES `subreddit_s
 ALTER TABLE `subreddit` ADD FOREIGN KEY (`display_name`) REFERENCES `subreddit_media` (`display_name`);
 
 ALTER TABLE `subreddit` ADD FOREIGN KEY (`display_name`) REFERENCES `subreddit_permissions` (`display_name`);
-
-CREATE TABLE `subreddit_comment_media_subreddit` (
-  `subreddit_comment_media_display_name` varchar,
-  `subreddit_display_name` varchar,
-  PRIMARY KEY (`subreddit_comment_media_display_name`, `subreddit_display_name`)
-);
-
-ALTER TABLE `subreddit_comment_media_subreddit` ADD FOREIGN KEY (`subreddit_comment_media_display_name`) REFERENCES `subreddit_comment_media` (`display_name`);
-
-ALTER TABLE `subreddit_comment_media_subreddit` ADD FOREIGN KEY (`subreddit_display_name`) REFERENCES `subreddit` (`display_name`);
-
 
 ALTER TABLE `wiki` ADD FOREIGN KEY (`subreddit`) REFERENCES `subreddit` (`display_name`);
 

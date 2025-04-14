@@ -17,46 +17,20 @@ def extract_line(line_nr, content_file_path):
                 return line
 
 
-def get_primary_key(table_name, sql_file_path="schemas/sqlite_schema.sql"):
+def get_primary_key(table_name, schema_json_file="schemas/db_schema.json"):
     """
     Gets primary key columns of a table.
 
     :param table_name: Name of the table.
-    :param sql_file_path: Path to the SQL file.
+    :param schema_json_file: Path to the schema json file.
 
     :return: List of primary key columns.
     """
-    conn = sqlite3.connect(":memory:")
-    cursor = conn.cursor()
 
-    with open(sql_file_path, "r", encoding="utf-8") as f:
-        schema_sql = f.read()
+    with open(schema_json_file, "r", encoding="utf-8") as f:
+        schema = json.load(f)
 
-    # Replace backticks with double quotes for compatibility
-    schema_sql = schema_sql.replace('`', '"')
-
-    # Extract and execute CREATE TABLE statements
-    create_table_statements = re.findall(r'CREATE TABLE.*?\);', schema_sql, re.S)
-    for statement in create_table_statements:
-        try:
-            cursor.execute(statement)
-        except sqlite3.OperationalError as e:
-            print(f"Error executing: {statement[:50]}... -> {e}")
-
-    # Get the primary key columns using PRAGMA index_list and index_info
-    cursor.execute(f"PRAGMA index_list({table_name})")
-    indexes = cursor.fetchall()
-
-    primary_keys = []
-
-    for index in indexes:
-        index_name, is_unique, is_pk = index[1], index[2], index[3]  # Extract index name
-        if is_pk:  # Check if it's a PRIMARY KEY index
-            cursor.execute(f"PRAGMA index_info({index_name})")
-            pk_columns = [row[2] for row in cursor.fetchall()]
-            primary_keys.extend(pk_columns)
-
-    conn.close()
+    primary_keys = schema[table_name]['primary_keys']
 
     return primary_keys
 
@@ -143,6 +117,8 @@ def get_database_type(conn) -> str:
                 return 'postgresql'
             case 'mysql':
                 return 'mysql'
+            case 'sqlite':
+                return 'sqlite'
             case _:
                 raise ValueError(f"Only SQLite, PostgreSQL, and MySQL connections are supported, not {db_type}")
 
@@ -160,7 +136,8 @@ def get_tables_database(engine):
     db_type = get_database_type(engine)
     match db_type:
         case 'sqlite':
-            result = engine.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table';"))
             tables = result.fetchall()
             return [table[0] for table in tables]
         case 'mysql':
