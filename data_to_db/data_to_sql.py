@@ -546,12 +546,13 @@ def set_index(conn, table_name):
         else:
             raise ValueError(f'Unknown database type: {db_type}')
 
-def generate_create_table_statement(table_name, schema_json_file) -> str:
+def generate_create_table_statement(table_name, schema_json_file, db_type) -> str:
     """
     Makes the CREATE TABLE statements from the json schema file.
 
     :param schema_json_file: json schema file
     :param table_name: name of the table
+    :param db_type: type of db (sqlite, postgreSQL, or mysql)
 
     :return: CREATE TABLE statement
     """
@@ -566,22 +567,29 @@ def generate_create_table_statement(table_name, schema_json_file) -> str:
     primary_keys = table.get("primary_key", [])
 
     lines = []
+    if db_type == 'sqlite' or db_type == 'mysql':
+        quotation_mark_table_statements = '`'
+    elif db_type == 'postgresql':
+        quotation_mark_table_statements = '"'
+    else:
+        raise ValueError(f'Unsupported database type: {db_type}')
+
     for col_name, col_type in columns.items():
         # Don't add PRIMARY KEY here if there are multiple keys
-        line = f'  "{col_name}" {col_type}'
+        line = f'  {quotation_mark_table_statements}{col_name}{quotation_mark_table_statements} {col_type}'
         if isinstance(primary_keys, list) and len(primary_keys) == 1 and col_name in primary_keys:
             line += " PRIMARY KEY"
         lines.append(line)
 
     # Add composite PRIMARY KEY constraint if needed
     if isinstance(primary_keys, list) and len(primary_keys) > 1:
-        primary_keys_alt = [f'"{pk}"' for pk in primary_keys]
+        primary_keys_alt = [f'{quotation_mark_table_statements}{pk}{quotation_mark_table_statements}' for pk in primary_keys]
         pks_text = ", ".join(primary_keys_alt)
         pk_line = f'  PRIMARY KEY ({pks_text})'
         lines.append(pk_line)
 
     column_definitions = ",\n".join(lines)
-    create_stmt = f'CREATE TABLE "{table_name}" (\n{column_definitions}\n);'
+    create_stmt = f'CREATE TABLE {quotation_mark_table_statements}{table_name}{quotation_mark_table_statements} (\n{column_definitions}\n);'
 
     return create_stmt
 
@@ -606,12 +614,12 @@ def create_tables_from_sql(conn, schema_json_file='schemas/db_schema.json'):
                 continue
 
             try:
-                create_table_statement = generate_create_table_statement(table_name, schema_json_file)
+                create_table_statement = generate_create_table_statement(table_name, schema_json_file, db_type)
                 connection.execute(text(create_table_statement))
                 print(f"Created table: {table_name}")
             except Exception as e:
                 print(f"Error creating table {table_name}: {e}")
-                print(generate_create_table_statement(table_name, schema_json_file))
+                print(generate_create_table_statement(table_name, schema_json_file, db_type))
 
 
 def generate_sql_database(conn):
