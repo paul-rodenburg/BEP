@@ -1,6 +1,6 @@
 from datetime import datetime
 import pandas as pd
-import json
+import orjson as json
 import os
 import math
 from itertools import chain
@@ -37,8 +37,7 @@ def get_table_columns(json_schema_path, table_name) -> list:
 
     :return: list of table names in the sqlite database file.
     """
-    with open(json_schema_path, "r", encoding="utf-8") as f:
-        schema = json.load(f)
+    schema = load_json(json_schema_path)
     columns = list(schema[table_name]['columns'].keys())
     return columns
 
@@ -136,15 +135,15 @@ def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[
 
 seen_keys = {}
 
-def process_cleaned_lines(cleaned_lines_dct) -> dict[str, pd.DataFrame]:
+def process_cleaned_lines(cleaned_lines_dct, check_duplicates=False) -> dict[str, pd.DataFrame]:
     global seen_keys
 
     """
-    Converts cleaned line entries to DataFrames, ensuring only globally unique rows based on primary keys.
+    Converts cleaned line entries to DataFrames, optionally ensuring globally unique rows based on primary keys.
 
     :param cleaned_lines_dct: cleaned lines dictionary
-    :param seen_keys: Optional dict to track already seen primary key combinations per table
-    :return: A dict with the table name as key and a deduplicated DataFrame as value.
+    :param check_duplicates: If True, ensure global uniqueness using seen_keys. If False, skip deduplication.
+    :return: A dict with the table name as key and a DataFrame (possibly deduplicated) as value.
     """
     for table_name, data in cleaned_lines_dct.items():
         if not data:
@@ -156,17 +155,20 @@ def process_cleaned_lines(cleaned_lines_dct) -> dict[str, pd.DataFrame]:
             cleaned_lines_dct[table_name] = None
             continue
 
-        if table_name not in seen_keys:
-            seen_keys[table_name] = set()
+        if check_duplicates:
+            if table_name not in seen_keys:
+                seen_keys[table_name] = set()
 
         unique_rows = []
         for row in data:
             key = tuple(row.get(pm) for pm in primary_key_column)
             if None in key:
                 continue  # skip incomplete primary keys
-            if key not in seen_keys[table_name]:
+            if check_duplicates:
+                if key in seen_keys[table_name]:
+                    continue
                 seen_keys[table_name].add(key)
-                unique_rows.append(row)
+            unique_rows.append(row)
 
         if not unique_rows:
             cleaned_lines_dct[table_name] = None
@@ -284,8 +286,8 @@ def is_file_tables_added_db(data_file, tables, db_info_file) -> list:
     :return: list of table names that need to be added to the database
     """
     if os.path.isfile(db_info_file):
-        with open(db_info_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        data = load_json(db_info_file)
+
 
         for obj in data:
             if obj['file'] == data_file:
@@ -307,10 +309,9 @@ def add_file_table_db_info(data_file, tables, db_info_file):
     """
     if not os.path.isfile(db_info_file):
         with open(db_info_file, 'w', encoding='utf-8') as f:
-            json.dump([], f, indent=4)
+            f.write(json.dumps([], option=json.OPT_INDENT_2))
 
-    with open(db_info_file, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    data = load_json(db_info_file)
 
     file_entry = next((obj for obj in data if obj['file'] == data_file), None)
 
@@ -323,7 +324,7 @@ def add_file_table_db_info(data_file, tables, db_info_file):
         data.append({'file': data_file, 'success_tables': tables})
 
     with open(db_info_file, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4)
+        f.write(json.dumps(data, option=json.OPT_INDENT_2))
 
 def get_data_file(data_files_tables, table_name) -> str|None:
     """
@@ -339,7 +340,7 @@ def get_data_file(data_files_tables, table_name) -> str|None:
             return file
     return None  # Returns None if the table_name is not found
 
-def load_json(file_path) -> dict:
+def load_json(file_path) -> dict|list:
     """
     Loads the content of a json file.
 
@@ -348,7 +349,10 @@ def load_json(file_path) -> dict:
     :return: a dict with the content of the json file
     """
     with open(file_path, "r") as f:
-        return json.load(f)
+        content = f.read()
+        if not content.strip():
+            return []
+        return json.loads(content)
 
 
 def get_tables_to_skip(json_data) -> set:
@@ -380,7 +384,7 @@ def update_json_with_table_duplicates(json_file, table_name, data_file):
             if table_name not in entry["duplicates_removed"]:
                 entry["duplicates_removed"].append(table_name)
     with open(json_file, "w") as f:
-        json.dump(json_data, f, indent=2)
+        f.write(json.dumps(json_data, option=json.OPT_INDENT_2))
 
 def clean_json_duplicates(json_file):
     """
@@ -392,11 +396,13 @@ def clean_json_duplicates(json_file):
     for entry in json_data:
         if "duplicates_removed" in entry and "success_tables" in entry:
             entry["duplicates_removed"] = [table for table in entry["duplicates_removed"] if table in entry["success_tables"]]
-    with open(json_file, "w") as f:
-        json.dump(json_data, f, indent=2)
+    with open(json_file, "wb") as f:
+        f.write(json.dumps(json_data, option=json.OPT_INDENT_2))
 
-
+delete_all = False
 def delete_table_db(table_name, engine):
+    global delete_all
+
     """
     If a table exists, asks the user to delete it. If the table does not exist, noting is done.
 
@@ -409,10 +415,17 @@ def delete_table_db(table_name, engine):
 
     with engine.connect() as conn:
         if table_exists(conn, table_name, db_type):
-            delete_confirm = input(
-                f'Table {table_name} already exists. Delete anyway? (y/n)')
+            if delete_all:
+                delete_confirm = 'y'
+            else:
+                delete_confirm = input(
+                    f'Table {table_name} already exists. Delete anyway? (y/n) (or yy to delete all)')
             if delete_confirm.lower().strip() != 'y':
-                return True
+                if delete_confirm.lower().strip() == 'yy':
+                    delete_all = True
+                    print(f'Deleting all..')
+                else:
+                    return True
         else:  # Table does not exist
             return
 
@@ -556,9 +569,7 @@ def generate_create_table_statement(table_name, schema_json_file, db_type) -> st
 
     :return: CREATE TABLE statement
     """
-    with open(schema_json_file, 'r') as f:
-        schema = json.load(f)
-
+    schema = load_json(schema_json_file)
     if table_name not in schema:
         raise ValueError(f"Table '{table_name}' not found in the schema.")
 
@@ -602,8 +613,7 @@ def create_tables_from_sql(conn, schema_json_file='schemas/db_schema.json'):
     :param schema_json_file: path to the schema json file
     """
     db_type = get_database_type(conn)
-    with open(schema_json_file, 'r', encoding='utf-8') as f:
-        schema = json.load(f)
+    schema = load_json(schema_json_file)
 
     tables = list(schema.keys())
 
@@ -645,7 +655,7 @@ def generate_sql_database(conn):
 
     if not os.path.isfile(db_info_file):
         with open(db_info_file, 'w', encoding='utf-8') as f:
-            json.dump([], f, indent=4)
+            f.write(json.dumps([], option=json.OPT_INDENT_2))
 
     clean_json_duplicates(db_info_file)
 
@@ -653,8 +663,7 @@ def generate_sql_database(conn):
 
     for table in get_tables_database(conn):
         delete_table = True
-        with open(db_info_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        data = load_json(db_info_file)
         for obj in data:
             if table in obj['success_tables']:
                 delete_table = False
@@ -668,11 +677,10 @@ def generate_sql_database(conn):
     table_columns = dict()
 
     # Load config
-    with open('config.json', 'r', encoding='utf-8') as f:
-        data = json.load(f)
-        data_files = list(data['data_files_tables'].keys())
-        data_files_tables = data['data_files_tables']
-        maximum_rows_database = data['maximum_rows_database']
+    data = load_json('config.json')
+    data_files = list(data['data_files_tables'].keys())
+    data_files_tables = data['data_files_tables']
+    maximum_rows_database = data['maximum_rows_database']
 
 
     create_tables_from_sql(conn)

@@ -1,7 +1,7 @@
 {
   "mysql": {
     "username": "root",
-    "password": null,
+    "password": "admin",
     "host": "localhost",
     "custom_engine_url": null
   },
