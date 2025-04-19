@@ -308,8 +308,7 @@ def add_file_table_db_info(data_file, tables, db_info_file):
     :param db_info_file: path to the json db info file
     """
     if not os.path.isfile(db_info_file):
-        with open(db_info_file, 'w', encoding='utf-8') as f:
-            f.write(json.dumps([], option=json.OPT_INDENT_2))
+        write_json([], db_info_file)
 
     data = load_json(db_info_file)
 
@@ -323,8 +322,7 @@ def add_file_table_db_info(data_file, tables, db_info_file):
     else:
         data.append({'file': data_file, 'success_tables': tables})
 
-    with open(db_info_file, 'w', encoding='utf-8') as f:
-        f.write(json.dumps(data, option=json.OPT_INDENT_2))
+    write_json(data, db_info_file)
 
 def get_data_file(data_files_tables, table_name) -> str|None:
     """
@@ -354,6 +352,15 @@ def load_json(file_path) -> dict|list:
             return []
         return json.loads(content)
 
+def write_json(data: dict|list, file_path: str):
+    """
+    Writes the content of a dict or list to a json file.
+
+    :param data: the data to write to the json file
+    :param file_path: path to the json file to write to
+    """
+    with open(file_path, "wb") as f:
+        f.write(json.dumps(data, option=json.OPT_INDENT_2))
 
 def get_tables_to_skip(json_data) -> set:
     """
@@ -383,8 +390,7 @@ def update_json_with_table_duplicates(json_file, table_name, data_file):
                 entry["duplicates_removed"] = []
             if table_name not in entry["duplicates_removed"]:
                 entry["duplicates_removed"].append(table_name)
-    with open(json_file, "w") as f:
-        f.write(json.dumps(json_data, option=json.OPT_INDENT_2))
+    write_json(json_data, json_file)
 
 def clean_json_duplicates(json_file):
     """
@@ -396,8 +402,7 @@ def clean_json_duplicates(json_file):
     for entry in json_data:
         if "duplicates_removed" in entry and "success_tables" in entry:
             entry["duplicates_removed"] = [table for table in entry["duplicates_removed"] if table in entry["success_tables"]]
-    with open(json_file, "wb") as f:
-        f.write(json.dumps(json_data, option=json.OPT_INDENT_2))
+    write_json(json_data, json_file)
 
 delete_all = False
 def delete_table_db(table_name, engine):
@@ -654,8 +659,7 @@ def generate_sql_database(conn):
     print(f'Only adding new data. To rebuild existing tables, remove them from the {db_info_file} file')
 
     if not os.path.isfile(db_info_file):
-        with open(db_info_file, 'w', encoding='utf-8') as f:
-            f.write(json.dumps([], option=json.OPT_INDENT_2))
+        write_json([], db_info_file)
 
     clean_json_duplicates(db_info_file)
 
