@@ -168,14 +168,16 @@ def make_mysql_engine(db_name=None):
         user = data["username"]
         password = data["password"]
         custom_engine_url = data["custom_engine_url"]
-        if db_name is not None:
-            custom_engine_url = f"{custom_engine_url}/{db_name}"
+
     if custom_engine_url is not None:
         engine_url = custom_engine_url
     elif password is not None:
         engine_url = f"mysql+pymysql://{user}:{password}@{host}"
     else:
         engine_url = f"mysql+pymysql://{user}@{host}"
+
+    if db_name is not None:
+        engine_url = f"{engine_url}/{db_name}"
 
     engine = create_engine(engine_url)
     return engine
