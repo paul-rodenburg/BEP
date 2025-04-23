@@ -4,6 +4,7 @@ from tqdm import tqdm
 from general import get_primary_key, check_files, make_mongodb_engine
 from line_counts import get_line_count_file
 import os
+from data_to_sql import add_file_table_db_info, is_file_tables_added_db
 
 # Update working directory
 current_directory = os.getcwd()
@@ -25,9 +26,13 @@ with open('config.json', 'r', encoding='utf-8') as f:
 
 
 db = make_mongodb_engine()
+db_info_file = 'databases/db_info_mongodb.json'
 
 for data_file, tables_file in data_files_tables.items():
     collection_name = tables_file['mongodb']
+    if not is_file_tables_added_db(data_file, collection_name, db_info_file):
+        print(f'Skipping {collection_name}...')
+        continue
     collection = db[collection_name]  # Collection Name
 
     # Check if collection exists
@@ -73,5 +78,5 @@ for data_file, tables_file in data_files_tables.items():
             if buffer:
                 collection.insert_many(buffer)
                 pbar.update(len(buffer))
-
+    add_file_table_db_info(data_file, collection_name, db_info_file)
 print("Data import completed successfully!")
