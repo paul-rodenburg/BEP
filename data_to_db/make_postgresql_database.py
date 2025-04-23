@@ -7,8 +7,10 @@ current_directory = os.getcwd()
 parent_directory = os.path.dirname(current_directory)
 os.chdir(parent_directory)
 
+# Make 'databases' folder for SQLite database and .json file containing info about each database
 os.makedirs('databases', exist_ok=True)
 
+# Check if necessary data files exist
 check_files()
 
 # Make engine

@@ -125,8 +125,8 @@
   "subreddit_metadata": {
     "columns": {
       "display_name": "text",
-      "earliest_comment_at": "integer",
-      "earliest_post_at": "integer",
+      "earliest_comment": "integer",
+      "earliest_post": "integer",
       "num_comments": "integer",
       "num_comments_updated_at": "integer",
       "num_posts": "integer",

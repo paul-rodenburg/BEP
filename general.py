@@ -1,13 +1,20 @@
 import json
 import sqlite3
-import re
+from typing import Any, Mapping
+from pymongo import MongoClient
 from collections import deque
-
+from pymongo.synchronous.database import Database
 from sqlalchemy import Engine, text, create_engine
 
 import os
 
-def extract_line(line_nr, content_file_path):
+def extract_line(line_nr, content_file_path) -> str|None:
+    """"
+    Extracts a line from a file given a line number.
+
+    :param line_nr: The line number to extract.
+    :return: The extracted line, or None if the line number is invalid or the file is empty.
+    """
     line_nr = int(line_nr)
     count_line_find = 0
     with open(content_file_path, 'r', encoding='utf-8') as f:
@@ -15,7 +22,7 @@ def extract_line(line_nr, content_file_path):
             count_line_find += 1
             if count_line_find == line_nr:
                 return line
-
+    return None
 
 def get_primary_key(table_name, schema_json_file="schemas/db_schema.json"):
     """
@@ -108,6 +115,7 @@ def check_files():
     with open('config.json', 'r', encoding='utf-8') as f:
         data = json.load(f)
         files = list(data['data_files_tables'].keys())
+    files.append('character_lengths.json')
 
     files_not_found = []
     for file in files:
@@ -182,14 +190,24 @@ def make_mysql_engine(db_name=None):
     engine = create_engine(engine_url)
     return engine
 
-def make_mongodb_engine():
+def make_mongodb_engine() -> Database[Mapping[str, Any] | Any]:
     """
-    Makes a sqlite connection
-    :return: a sqlite connection
+    Makes a mongodb connection
+    :return: a mongodb connection
     """
-    raise ValueError(f"'make_mongodb_engine' NEEDS TO BE IMPLEMENTED")
     with open('config.json', 'r', encoding='utf-8') as f:
-        data = json.load(f)['sqlite']
-        db_location_relative = data['db_location_relative']
-    engine = create_engine(f'sqlite:///{db_location_relative}')
-    return engine
+        data = json.load(f)['mongodb']
+        host = data["host"]
+        port = data["port"]
+        db_name = data["db_name"]
+        custom_engine_url = data["custom_engine_url"]
+    # Connect to MongoDB
+    if custom_engine_url is not None:
+        client = MongoClient(custom_engine_url)
+    else:
+        client = MongoClient(f"mongodb://{host}:{port}/")
+
+    # Access a database (this creates it if it doesn't exist)
+    db = client[db_name]
+
+    return db

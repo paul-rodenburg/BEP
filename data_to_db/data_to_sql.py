@@ -14,6 +14,7 @@ import re
 progress_bar = None
 clean_errors = 0
 maximum_rows_database = 0
+MAX_MYSQL_TEXT_LENGTH = 65_500 # Actual max length is 65,535 but we keep some safety margin
 
 def unnest(lst):
     """
@@ -61,7 +62,7 @@ def process_line_rules(line: dict) -> list[dict]:
     return lines_rules_cleaned
 
 
-def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[str, list[dict]]:
+def clean_line(line_input, tables, table_columns, ignored_author_names, db_type) -> dict[str, list[dict]]|None:
     """
     Gets a line and cleans it for all the tables.
 
@@ -69,7 +70,8 @@ def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[
     :param tables: tables for the line
     :param table_columns: columns for the tables
     :param ignored_author_names: author names to ignore
-    :return: A dict with as key the table name and value the cleaned line for that table
+    :param db_type: database type
+    :return: A dict with as key the table name and value the cleaned line for that table. If there is an error with the line, returns None.
     """
     global clean_errors
 
@@ -131,6 +133,16 @@ def clean_line(line_input, tables, table_columns, ignored_author_names) -> dict[
             cleaned_lines.append(l)
 
         cleaned_data[table] = cleaned_lines
+
+    # if db_type == 'mysql':
+    #     cleaned_data_mysql = cleaned_data.copy()
+    #     cleaned_data = {}
+    #     for table, lines in cleaned_data_mysql.items():
+    #         table_lines = []
+    #         for l in lines:
+    #             l = {k: (v[:65_530] if isinstance(v, str) else v) for k, v in l.items()}
+    #             table_lines.append(l)
+    #         cleaned_data[table] = table_lines
     return cleaned_data
 
 seen_keys = {}
@@ -188,7 +200,7 @@ def process_cleaned_lines(cleaned_lines_dct, check_duplicates=False) -> dict[str
 
 sql_count = 0
 
-def process_table(data_file, tables, conn, table_columns, ignored_author_names, chunk_size=10_000):
+def process_table(data_file, tables, conn, table_columns, ignored_author_names, chunk_size):
     """
     Processes tables, so writing the data to a database.
 
@@ -202,7 +214,8 @@ def process_table(data_file, tables, conn, table_columns, ignored_author_names, 
     global sql_count
 
     added_count = 0
-    for chunk_data in extract_lines(data_file, tables, table_columns, ignored_author_names, chunk_size):
+    db_type = get_database_type(conn)
+    for chunk_data in extract_lines(data_file, tables, table_columns, ignored_author_names, db_type, chunk_size):
         for table_name, data in chunk_data.items():
             if data is not None and not data.empty:
                 write_to_db(data, table_name, conn, len(chunk_data), chunk_size=chunk_size)
@@ -212,7 +225,7 @@ def process_table(data_file, tables, conn, table_columns, ignored_author_names, 
         print(f'Error! All chunks of {tables} were empty')
 
 
-def extract_lines(data_file, tables, table_columns, ignored_author_names, chunk_size=10_000) -> dict[str, pd.DataFrame]:
+def extract_lines(data_file, tables, table_columns, ignored_author_names, db_type, chunk_size) -> dict[str, pd.DataFrame]:
     """
     Processes lines in the from the Reddit data file.
 
@@ -220,6 +233,7 @@ def extract_lines(data_file, tables, table_columns, ignored_author_names, chunk_
     :param tables: tables to process
     :param table_columns: dictionary containing tables names as keys and the value are the column names corresponding to the tables
     :param ignored_author_names: author names to ignore
+    :param db_type: database type
     :param chunk_size: number of lines to read at a time
 
     :return: A dict with as key the table name and value the cleaned lines for that table in pandas DataFrame
@@ -237,7 +251,7 @@ def extract_lines(data_file, tables, table_columns, ignored_author_names, chunk_
     with open(data_file, 'r', encoding='utf-8') as f_data:
 
         for line in f_data:
-            cleaned_data = clean_line(line, tables, table_columns, ignored_author_names)
+            cleaned_data = clean_line(line, tables, table_columns, ignored_author_names, db_type)
             for table_name, lines_cleaned in cleaned_data.items():
                 if lines_cleaned is not None:
                     lines_clean[table_name].extend(lines_cleaned)
@@ -270,7 +284,11 @@ def write_to_db(df, table, conn, len_tables, chunk_size=10_000):
     :param chunk_size: number of lines to read at a time
     """
     global sql_count, progress_bar
-    df.to_sql(table, conn, if_exists="append", index=False, chunksize=5000)
+    try:
+        df.to_sql(table, conn, if_exists="append", index=False, chunksize=5000)
+    except:
+        df.to_csv('error.csv', index=False)
+        exit(1)
     sql_count += 1
     progress_bar.set_postfix_str(f'[{sql_count:,}/{math.ceil(progress_bar.total / chunk_size * len_tables):,} SQL writes]')
 
@@ -324,19 +342,6 @@ def add_file_table_db_info(data_file, tables, db_info_file):
 
     write_json(data, db_info_file)
 
-def get_data_file(data_files_tables, table_name) -> str|None:
-    """
-    Gets the data file path corresponding to the given table name.
-
-    :param data_files_tables: dictionary that maps data file paths to table names
-    :param table_name: the name of the table corresponding to a data file.
-
-    :return: path to the data file if table name found, otherwise None
-    """
-    for file, tables in data_files_tables.items():
-        if table_name in tables:
-            return file
-    return None  # Returns None if the table_name is not found
 
 def load_json(file_path) -> dict|list:
     """
@@ -564,6 +569,21 @@ def set_index(conn, table_name):
         else:
             raise ValueError(f'Unknown database type: {db_type}')
 
+def get_file_from_table_name(table_name: str) -> str|None:
+    """
+    Gets the data file path corresponding to the given table name.
+    :param table_name: name of table in database to find the data file for
+    :return: the path to the data file corresponding to the given table name.
+    """
+    config_data_tables = load_json('config.json')['data_files_tables']
+    for k, v in config_data_tables.items():
+        if table_name in v['sql']:
+            return k
+
+    # Return None if the table name is not found in the config.json file
+    return None
+
+
 def generate_create_table_statement(table_name, schema_json_file, db_type) -> str:
     """
     Makes the CREATE TABLE statements from the json schema file.
@@ -579,6 +599,14 @@ def generate_create_table_statement(table_name, schema_json_file, db_type) -> st
         raise ValueError(f"Table '{table_name}' not found in the schema.")
 
     table = schema[table_name]
+    # MySQL has shorter character length for TEXT than other databases, so change it to LONGTEXT if needed
+    if db_type == 'mysql':
+        data_file = get_file_from_table_name(table_name)
+        character_lengths_data = load_json('character_lengths.json')[data_file]
+        for col_name, col_type in table["columns"].items():
+            if character_lengths_data[col_name] >= MAX_MYSQL_TEXT_LENGTH:
+                table["columns"][col_name] = 'LONGTEXT'
+
     columns = table["columns"]
     primary_keys = table.get("primary_key", [])
 
@@ -685,7 +713,7 @@ def generate_sql_database(conn):
     data_files = list(data['data_files_tables'].keys())
     data_files_tables = data['data_files_tables']
     maximum_rows_database = data['maximum_rows_database']
-
+    chunk_size = data[db_type]['chunk_size']
 
     create_tables_from_sql(conn)
     # Preparing data
@@ -706,7 +734,7 @@ def generate_sql_database(conn):
         tables_to_process = is_file_tables_added_db(file, tables, db_info_file)
         tables_to_process = list(set(tables_to_process) - tables_exist_skip)
         if tables_to_process:
-            process_table(file, tables_to_process, conn, table_columns, ignored_author_names)
+            process_table(file, tables_to_process, conn, table_columns, ignored_author_names, chunk_size)
             add_file_table_db_info(file, tables_to_process, db_info_file)
             for table in tables_to_process:
                 set_index(conn, table)

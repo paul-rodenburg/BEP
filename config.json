@@ -3,10 +3,13 @@
     "username": "root",
     "password": "admin",
     "host": "localhost",
-    "custom_engine_url": null
+    "db_name": "reddit_data_ALL",
+    "custom_engine_url": null,
+    "chunk_size": 10000
   },
   "sqlite": {
-    "db_location_relative": "databases/reddit_data_ALL.db"
+    "db_location_relative": "databases/reddit_data_ALL.db",
+    "chunk_size": 10000
   },
   "postgresql": {
     "username": "postgres",
@@ -14,13 +17,15 @@
     "host": "localhost",
     "port": "5432",
     "db_name": "reddit_data_ALL",
-    "custom_engine_url": null
+    "custom_engine_url": null,
+    "chunk_size": 10000
   },
   "mongodb": {
     "host": "localhost",
     "port": "27017",
     "db_name": "reddit_data",
-    "custom_engine_url": null
+    "custom_engine_url": null,
+    "chunk_size": 1000
   },
   "maximum_rows_database": 80000000,
   "dates_data_files_process_order": [
