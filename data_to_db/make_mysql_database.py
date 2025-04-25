@@ -11,16 +11,11 @@ os.chdir(parent_directory)
 # Make 'databases' folder for SQLite database and .json file containing info about each database
 os.makedirs('databases', exist_ok=True)
 
-# Check if character count file exists
-# This is necessary to change TEXT to LONGTEXT for some attributes in MySQL, because of long lengths of data
-if not os.path.isfile('character_lengths.json'):
-    raise FileNotFoundError("character_lengths.json not found. Please run the script 'count_characters_db.py' first.")
-
 # Make engine
 engine = make_mysql_engine()
 
 # Check if necessary data files exist
-check_files()
+check_files(db_type='mysql')
 
 DB_NAME = load_json('config.json')['mysql']['db_name']
 

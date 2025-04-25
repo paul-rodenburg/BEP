@@ -67,6 +67,10 @@ def find_max_char_lengths(ndjson_file, output_file, max_line_count, progress_bar
 
     # Write the results as JSON
     current_data[ndjson_file] = max_lengths
+
+    # Add rule_id for subreddit_rules_2025-01
+    if ndjson_file == 'data/subreddits/subreddit_rules_2025-01/subreddit_rules_2025-01':
+        current_data['data/subreddits/subreddit_rules_2025-01/subreddit_rules_2025-01']['rule_id'] = 20
     write_json(current_data, output_file)
 
 
@@ -76,6 +80,7 @@ def generate_character_lengths(files_to_process_count: dict):
 
     :param files_to_process: dict containing the files to process as key and as value the number of lines to process (can be less than the actual line count of this file)
     """
+    # Setup progress bar and load the data file paths already processed
     all_lines = sum([v for v in files_to_process_count.values()])
     progress_bar = tqdm(total=all_lines, desc="Processing lines")
     current_files = set()
@@ -83,14 +88,16 @@ def generate_character_lengths(files_to_process_count: dict):
         current_json = load_json('character_lengths.json')
         current_files = set(current_json.keys())
 
-    for i in range(len(files_to_process_count)):
-        file = files[i]
-        progress_bar.set_postfix_str(f"At file {i+1}/{len(files)}")
+    # Loop over files to process and find max characters per attribute
+    count_files = 0
+    for file, file_line_count in files_to_process_count.items():
+        count_files += 1
+        progress_bar.set_postfix_str(f"At file {count_files}/{len(files_to_process_count)}")
         if file in current_files:
             time.sleep(0.3)
             continue_user = input(f"\nFile {file} already exists. Do you want to process this file again? (y/n) ")
             if continue_user.lower().strip() == 'n':
-                progress_bar.total -= files_count[file]
+                progress_bar.total -= file_line_count
                 continue
         find_max_char_lengths(file, "character_lengths.json", max_line_count, progress_bar)
 

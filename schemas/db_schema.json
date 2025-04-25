@@ -2,30 +2,56 @@
   "post": {
     "columns": {
       "id": "text",
-      "author_fullname": "text",
-      "created_utc": "integer",
-      "selftext": "text",
+      "allow_live_comments": "bool",
       "archived": "bool",
+      "author_fullname": "text",
+      "author_is_blocked": "bool",
+      "author_patreon_flair": "bool",
+      "can_gild": "bool",
+      "can_mod_post": "bool",
+      "category": "text",
+      "content_categories": "text",
+      "contest_mode": "bool",
+      "created_utc": "integer",
+      "distinguished": "text",
+      "domain": "text",
       "downs": "integer",
-      "ups": "integer",
-      "edited": "bool",
+      "edited": "text",
+      "gilded": "bool",
       "hidden": "bool",
+      "hide_score": "bool",
+      "is_crosspostable": "bool",
+      "is_meta": "bool",
+      "is_original_content": "bool",
+      "is_reddit_media_domain": "bool",
+      "is_robot_indexable": "bool",
+      "is_self": "bool",
+      "is_video": "bool",
       "locked": "bool",
+      "media_only": "bool",
+      "name": "text",
+      "no_follow": "bool",
       "num_comments": "integer",
       "num_crossposts": "integer",
+      "over_18": "bool",
       "permalink": "text",
+      "pinned": "bool",
+      "quarantine": "bool",
+      "saved": "bool",
       "score": "integer",
+      "selftext": "text",
       "send_replies": "bool",
       "spoiler": "bool",
-      "subreddit": "text",
-      "thumbnail": "text",
-      "thumbnail_height": "integer",
-      "thumbnail_width": "integer",
+      "stickied": "bool",
+      "subreddit_id": "text",
+      "subreddit_subscribers": "integer",
+      "subreddit_type": "text",
+      "suggested_sort": "text",
       "title": "text",
       "total_awards_received": "integer",
-      "top_awarded_type": "text",
-      "pinned": "bool",
-      "contest_mode": "bool"
+      "ups": "integer",
+      "upvote_ratio": "float",
+      "url": "text"
     },
     "primary_keys": ["id"],
     "foreign_keys": [
@@ -43,8 +69,7 @@
     "columns": {
       "author_fullname": "text",
       "author": "text",
-      "author_premium": "bool",
-      "over_18": "bool"
+      "author_premium": "bool"
     },
     "primary_keys": ["author_fullname"]
   },
@@ -220,53 +245,47 @@
       }
     ]
   },
-  "banned": {
+  "collapsed_comment": {
     "columns": {
-      "author_fullname": "text",
-      "subreddit_id": "text",
-      "banned_at_utc": "integer",
-      "banned_by": "text"
+      "id": "text",
+      "collapsed_reason": "text",
+      "collapsed_reason_code": "text"
     },
-    "primary_keys": ["author_fullname", "subreddit_id"],
-    "foreign_keys": [
-      {
-        "column": "author_fullname",
-        "references": { "table": "author", "column": "author_fullname" }
-      },
-      {
-        "column": "subreddit_id",
-        "references": { "table": "subreddit", "column": "id" }
-      }
-    ]
+    "primary_keys": ["id"]
   },
   "comment": {
     "columns": {
       "id": "text",
-      "parent_id": "text",
-      "body": "text",
+      "archived":  "bool",
       "author_fullname": "text",
+      "author_is_blocked": "bool",
+      "author_patreon_flair": "bool",
+      "body": "text",
+      "can_gild": "text",
+      "can_mod_post": "text",
+      "collapsed": "text",
+      "controversiality": "integer",
       "created_utc": "integer",
-      "archived": "bool",
+      "distinguished": "text",
       "downs": "integer",
-      "ups": "integer",
-      "edited": "bool",
-      "hidden": "bool",
+      "edited": "text",
+      "gilded": "integer",
+      "is_submitter": "bool",
+      "link_id": "text",
       "locked": "bool",
+      "name": "text",
+      "no_follow": "bool",
+      "parent_id": "text",
       "permalink": "text",
-      "removal_reason": "text",
-      "removed_by": "text",
       "score": "integer",
+      "score_hidden": "bool",
       "send_replies": "bool",
-      "spoiler": "bool",
+      "stickied": "bool",
       "subreddit": "text",
-      "thumbnail": "text",
-      "thumbnail_height": "integer",
-      "thumbnail_width": "integer",
-      "title": "text",
+      "subreddit_id": "text",
+      "subreddit_type": "text",
       "total_awards_received": "integer",
-      "top_awarded_type": "text",
-      "pinned": "bool",
-      "contest_mode": "bool"
+      "ups": "integer"
     },
     "primary_keys": ["id"],
     "foreign_keys": [

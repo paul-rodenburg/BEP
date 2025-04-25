@@ -31,20 +31,20 @@ db_info_file = 'databases/db_info_mongodb.json'
 for data_file, tables_file in data_files_tables.items():
     collection_name = tables_file['mongodb']
     if not is_file_tables_added_db(data_file, collection_name, db_info_file):
-        print(f'Skipping {collection_name}...')
+        input(f'[MongoDB] Skipping {collection_name}...')
         continue
     collection = db[collection_name]  # Collection Name
 
     # Check if collection exists
     if collection_name in db.list_collection_names():
 
-        response = input(f"Collection '{collection_name}' already exists. Remove it? (y/n): ")
+        response = input(f"[MongoDB] Collection '{collection_name}' already exists. Remove it? (y/n): ")
 
         if response == "y":
             collection.drop()  # Remove collection
-            print(f"Collection '{collection_name}' deleted.")
+            input(f"[MongoDB] Collection '{collection_name}' deleted.")
         elif response == "n":
-            print(f"Skipping collection '{collection_name}'.")
+            input(f"[MongoDB] Skipping collection '{collection_name}'.")
             continue  # Skip to next iteration if user says no
 
     # Add index

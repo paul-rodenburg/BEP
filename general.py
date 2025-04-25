@@ -5,7 +5,7 @@ from pymongo import MongoClient
 from collections import deque
 from pymongo.synchronous.database import Database
 from sqlalchemy import Engine, text, create_engine
-
+import subprocess
 import os
 
 def extract_line(line_nr, content_file_path) -> str|None:
@@ -111,7 +111,15 @@ def read_file_reverse(file_path):
 
 
 
-def check_files():
+def check_files(db_type: None|str = None):
+    # Check if character count file exists
+    # This is necessary to change TEXT to LONGTEXT for some attributes in MySQL, because of long lengths of data
+    if db_type and db_type.lower().strip() == 'mysql' and not os.path.isfile('character_lengths.json'):
+        print("character_lengths.json not found. Running the script now...")
+        subprocess.run(["python", "count_characters_db.py"])
+        # raise FileNotFoundError(
+        #     "character_lengths.json not found. Please run the script 'count_characters_db.py' first.")
+
     with open('config.json', 'r', encoding='utf-8') as f:
         data = json.load(f)
         files = list(data['data_files_tables'].keys())
@@ -211,3 +219,23 @@ def make_mongodb_engine() -> Database[Mapping[str, Any] | Any]:
     db = client[db_name]
 
     return db
+
+
+def capitalize_db_type(db_type: str) -> str:
+    """
+    Capitalizes the name of a database type.
+
+    :param db_type: The name of the database type.
+    :return: The capitalized name of the database type.
+    """
+    # Make sure the db type is lower case and stripped
+    db_type = db_type.lower().strip()
+
+    if db_type == 'sqlite':
+        return 'SQLite'
+    elif db_type == 'postgresql':
+        return 'PostgreSQL'
+    elif db_type == 'mysql':
+        return 'MySQL'
+    else:
+        return f"Unknown {db_type}'"

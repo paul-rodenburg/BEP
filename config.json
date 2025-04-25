@@ -1,7 +1,7 @@
 {
   "mysql": {
     "username": "root",
-    "password": "admin",
+    "password": null,
     "host": "localhost",
     "db_name": "reddit_data_ALL",
     "custom_engine_url": null,
@@ -75,11 +75,11 @@
   },
   "data_files_tables": {
     "data/submissions/RS_2025-01/RS_2025-01": {
-      "sql": ["post", "author", "banned"],
+      "sql": ["post", "author"],
       "mongodb": "post"
     },
     "data/comments/RC_2025-01/RC_2025-01": {
-      "sql": ["comment"],
+      "sql": ["comment", "collapsed_comment"],
       "mongodb": "comment"
     },
     "data/subreddits/subreddit_rules_2025-01/subreddit_rules_2025-01": {
