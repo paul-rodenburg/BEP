@@ -243,7 +243,7 @@ def extract_lines(data_file, tables, table_columns, ignored_author_names, db_typ
 
     progress_bar_total = min(get_line_count_file(data_file), maximum_rows_database)
     db_type_capitalized = capitalize_db_type(db_type)
-    progress_bar = tqdm(total=progress_bar_total, desc=f"[{db_type_capitalized}] Processing {len(tables)} table(s): {tables} (from {data_file.split('/')[-1]})\n")
+    progress_bar = tqdm(total=progress_bar_total, desc=f"[{db_type_capitalized}] Processing {len(tables)} table(s): {tables} (from {data_file.split('/')[-1]})")
 
     lines_cleaned_count = 0
     with open(data_file, 'r', encoding='utf-8') as f_data:
