@@ -6,7 +6,8 @@ import math
 from itertools import chain
 from sqlalchemy import text
 from tqdm import tqdm
-from general import get_primary_key, get_tables_database, get_database_type, capitalize_db_type
+from general import get_tables_database, get_database_type, capitalize_db_type, write_json
+from general import load_json_cached as load_json
 from line_counts import get_line_count_file
 import re
 
@@ -14,6 +15,22 @@ progress_bar = None
 clean_errors = 0
 maximum_rows_database = 0
 MAX_MYSQL_TEXT_LENGTH = 65_500 # Actual max length is 65,535 but we keep some safety margin
+
+# Load the schema in memory since it improved performance, reading the json many times takes time
+schema_global = None
+
+def get_primary_key(table_name, schema_json_file="schemas/db_schema.json"):
+    global schema_global
+    """
+    Gets primary key columns of a table.
+
+    :param table_name: Name of the table.
+    :param schema_json_file: Path to the schema json file.
+
+    :return: List of primary key columns.
+    """
+    schema = load_json(schema_json_file)
+    return schema.get(table_name, {}).get("primary_keys", [])
 
 def unnest(lst):
     """
@@ -59,6 +76,38 @@ def process_line_rules(line: dict) -> list[dict]:
         lines_rules_cleaned.append(rule)
 
     return lines_rules_cleaned
+
+
+def should_skip(line: dict, primary_keys: list) -> bool:
+    """
+    Determines whether the line should be skipped based on the primary keys and other values.
+    If any primary key value is None, the line is skipped. If all other values are None, the line is also skipped.
+
+    :param line: line to check.
+    :param primary_keys: primary keys to check.
+
+    :return: True if the line should be skipped, False otherwise.
+
+    """
+    # Check if any primary key value is None
+    if any(line.get(key) is None for key in primary_keys):
+        print('if 1')
+        print(line)
+        print(primary_keys)
+        exit(1)
+        return True
+
+    # Get all other keys not in primary_keys
+    other_keys = [k for k in line.keys() if k not in primary_keys]
+
+    # If all other values are None
+    if all(line.get(k) is None for k in other_keys):
+        print('if 2')
+        print(line)
+        print(primary_keys)
+        exit(1)
+        return True
+    return False
 
 
 def clean_line(line_input, tables, table_columns, ignored_author_names, db_type) -> dict[str, list[dict]]|None:
@@ -118,12 +167,18 @@ def clean_line(line_input, tables, table_columns, ignored_author_names, db_type)
             else:
                 line['edited'] = True
 
-        if table == 'post':
-            line['selftext'] = line['selftext'][:500]
         if table == 'author':
             if line['author'].strip().lower() in ignored_author_names:
                 continue
+        # If the distinguished is null (None) then the row should be disregarded.
+        # Only 'id' is here the primary key so should_skip does not work here since these table also have 'author_fullname' which is mostly not null
+        if table == 'distinguished_comment' or table == 'distinguished_post':
+            if line['distinguished'] is None:
+                continue
 
+        # If the value of the primary key(s) is/are null or all other values are null then skip this line
+        if should_skip(line, get_primary_key(table)):
+            continue
         if not isinstance(line, list):
             line = [line]
 
@@ -134,15 +189,6 @@ def clean_line(line_input, tables, table_columns, ignored_author_names, db_type)
 
         cleaned_data[table] = cleaned_lines
 
-    # if db_type == 'mysql':
-    #     cleaned_data_mysql = cleaned_data.copy()
-    #     cleaned_data = {}
-    #     for table, lines in cleaned_data_mysql.items():
-    #         table_lines = []
-    #         for l in lines:
-    #             l = {k: (v[:65_530] if isinstance(v, str) else v) for k, v in l.items()}
-    #             table_lines.append(l)
-    #         cleaned_data[table] = table_lines
     return cleaned_data
 
 seen_authors = set()
@@ -189,7 +235,6 @@ def process_cleaned_lines(cleaned_lines_dct) -> dict[str, pd.DataFrame]:
         df = df.map(lambda x: x.replace("\x00", "") if isinstance(x, str) else x)
 
         cleaned_lines_dct[table_name] = df
-
     return cleaned_lines_dct
 
 
@@ -286,7 +331,8 @@ def write_to_db(df, table, conn, len_tables, chunk_size=10_000):
         df.to_sql(table, conn, if_exists="append", index=False, chunksize=5000)
     except Exception as e:
         df.to_csv('error.csv', index=False)
-        print(f"\nError writing to database: {e}. df written to error.csv.")
+        df_type_capitalized = capitalize_db_type(get_database_type(conn))
+        print(f"\n[{df_type_capitalized}] Error writing to database: {e}. df written to error.csv.")
         exit(1)
     sql_count += 1
     progress_bar.set_postfix_str(f'[{sql_count:,}/{math.ceil(progress_bar.total / chunk_size * len_tables):,} SQL writes]')
@@ -341,30 +387,6 @@ def add_file_table_db_info(data_file, tables, db_info_file):
 
     write_json(data, db_info_file)
 
-
-def load_json(file_path) -> dict|list:
-    """
-    Loads the content of a json file.
-
-    :param file_path: path to the json file
-
-    :return: a dict with the content of the json file
-    """
-    with open(file_path, "r") as f:
-        content = f.read()
-        if not content.strip():
-            return []
-        return json.loads(content)
-
-def write_json(data: dict|list, file_path: str):
-    """
-    Writes the content of a dict or list to a json file.
-
-    :param data: the data to write to the json file
-    :param file_path: path to the json file to write to
-    """
-    with open(file_path, "wb") as f:
-        f.write(json.dumps(data, option=json.OPT_INDENT_2))
 
 def get_tables_to_skip(json_data) -> set:
     """
@@ -434,7 +456,7 @@ def delete_table_db(table_name, engine):
                 if delete_confirm.lower().strip() == 'yy':
                     delete_all = True
                     db_type_capitalized = capitalize_db_type(db_type)
-                    print(f'[{db_type_capitalized}] Deleting all..')
+                    print(f'[{db_type_capitalized}] Deleting all...')
                 else:
                     return True
         else:  # Table does not exist
@@ -619,7 +641,7 @@ def generate_create_table_statement(table_name, schema_json_file, db_type) -> st
                 table["columns"][col_name] = 'LONGTEXT'
 
     columns = table["columns"]
-    primary_keys = table.get("primary_key", [])
+    primary_keys = table.get("primary_keys", [])
 
     lines = []
     

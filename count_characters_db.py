@@ -1,5 +1,5 @@
 import orjson as json
-from data_to_db.data_to_sql import write_json, load_json
+from general import write_json, load_json
 from line_counts import get_line_count_file
 from tqdm import tqdm
 import os

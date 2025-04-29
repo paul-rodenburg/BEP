@@ -1,4 +1,4 @@
-import json
+import orjson as json
 import sqlite3
 from typing import Any, Mapping
 from pymongo import MongoClient
@@ -8,7 +8,48 @@ from sqlalchemy import Engine, text, create_engine
 import subprocess
 import os
 
-def extract_line(line_nr, content_file_path) -> str|None:
+
+def load_json(file_path) -> dict | list:
+    """
+    Loads the content of a json file.
+
+    :param file_path: path to the json file
+
+    :return: a dict with the content of the json file
+    """
+    with open(file_path, "r") as f:
+        content = f.read()
+        if not content.strip():
+            return []
+        return json.loads(content)
+
+
+# internal cache
+_json_cache = {}
+
+
+def load_json_cached(file_path) -> dict | list:
+    """
+    Loads JSON from a file, with in-memory caching.
+    If the file was already loaded, returns the cached version.
+    """
+    if file_path not in _json_cache:
+        _json_cache[file_path] = load_json(file_path)
+    return _json_cache[file_path]
+
+
+def write_json(data: dict | list, file_path: str):
+    """
+    Writes the content of a dict or list to a json file.
+
+    :param data: the data to write to the json file
+    :param file_path: path to the json file to write to
+    """
+    with open(file_path, "wb") as f:
+        f.write(json.dumps(data, option=json.OPT_INDENT_2))
+
+
+def extract_line(line_nr, content_file_path) -> str | None:
     """"
     Extracts a line from a file given a line number.
 
@@ -23,23 +64,6 @@ def extract_line(line_nr, content_file_path) -> str|None:
             if count_line_find == line_nr:
                 return line
     return None
-
-def get_primary_key(table_name, schema_json_file="schemas/db_schema.json"):
-    """
-    Gets primary key columns of a table.
-
-    :param table_name: Name of the table.
-    :param schema_json_file: Path to the schema json file.
-
-    :return: List of primary key columns.
-    """
-
-    with open(schema_json_file, "r", encoding="utf-8") as f:
-        schema = json.load(f)
-
-    primary_keys = schema[table_name]['primary_keys']
-
-    return primary_keys
 
 
 def get_database_type(conn) -> str:
@@ -68,6 +92,7 @@ def get_database_type(conn) -> str:
     else:
         raise ValueError(f"Only SQLite, PostgreSQL, and MySQL connections are supported, not {type(conn)}")
 
+
 def get_tables_database(engine):
     """
     Gets the tables of a database.
@@ -94,6 +119,7 @@ def get_tables_database(engine):
         case _:
             raise ValueError(f'Unknown database type: {db_type}')
 
+
 def read_file_reverse(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         # Initialize a deque with a fixed size, so it can store lines in reverse order
@@ -110,8 +136,7 @@ def read_file_reverse(file_path):
                     yield line  # Yield lines in reverse order
 
 
-
-def check_files(db_type: None|str = None):
+def check_files(db_type: None | str = None):
     # Check if character count file exists
     # This is necessary to change TEXT to LONGTEXT for some attributes in MySQL, because of long lengths of data
     if db_type and db_type.lower().strip() == 'mysql' and not os.path.isfile('character_lengths.json'):
@@ -120,9 +145,8 @@ def check_files(db_type: None|str = None):
         # raise FileNotFoundError(
         #     "character_lengths.json not found. Please run the script 'count_characters_db.py' first.")
 
-    with open('config.json', 'r', encoding='utf-8') as f:
-        data = json.load(f)
-        files = list(data['data_files_tables'].keys())
+    data = load_json('config.json')
+    files = list(data['data_files_tables'].keys())
     files.append('character_lengths.json')
 
     files_not_found = []
@@ -142,30 +166,31 @@ def get_count_rows_database(conn, table_name):
     conn.close()
     return count
 
+
 def make_sqlite_engine():
     """
     Makes a sqlite connection
     :return: a sqlite connection
     """
-    with open('config.json', 'r', encoding='utf-8') as f:
-        data = json.load(f)['sqlite']
-        db_location_relative = data['db_location_relative']
+    data = load_json('config.json')['sqlite']
+    db_location_relative = data['db_location_relative']
     engine = create_engine(f'sqlite:///{db_location_relative}')
     return engine
+
 
 def make_postgres_engine():
     """
     Makes a sqlite connection
     :return: a sqlite connection
     """
-    with open('config.json', 'r', encoding='utf-8') as f:
-        data = json.load(f)['postgresql']
-        host = data["host"]
-        user = data["username"]
-        password = data["password"]
-        port = data["port"]
-        db_name = data["db_name"]
-        custom_engine_url = data["custom_engine_url"]
+
+    data = load_json('config.json')['postgresql']
+    host = data["host"]
+    user = data["username"]
+    password = data["password"]
+    port = data["port"]
+    db_name = data["db_name"]
+    custom_engine_url = data["custom_engine_url"]
     if custom_engine_url is not None:
         engine = create_engine(custom_engine_url)
     else:
@@ -178,12 +203,11 @@ def make_mysql_engine(db_name=None):
     Makes a sqlite connection
     :return: a sqlite connection
     """
-    with open('config.json', 'r', encoding='utf-8') as f:
-        data = json.load(f)['mysql']
-        host = data["host"]
-        user = data["username"]
-        password = data["password"]
-        custom_engine_url = data["custom_engine_url"]
+    data = load_json('config.json')['mysql']
+    host = data["host"]
+    user = data["username"]
+    password = data["password"]
+    custom_engine_url = data["custom_engine_url"]
 
     if custom_engine_url is not None:
         engine_url = custom_engine_url
@@ -198,17 +222,17 @@ def make_mysql_engine(db_name=None):
     engine = create_engine(engine_url)
     return engine
 
+
 def make_mongodb_engine() -> Database[Mapping[str, Any] | Any]:
     """
     Makes a mongodb connection
     :return: a mongodb connection
     """
-    with open('config.json', 'r', encoding='utf-8') as f:
-        data = json.load(f)['mongodb']
-        host = data["host"]
-        port = data["port"]
-        db_name = data["db_name"]
-        custom_engine_url = data["custom_engine_url"]
+    data = load_json('config.json')['mongodb']
+    host = data["host"]
+    port = data["port"]
+    db_name = data["db_name"]
+    custom_engine_url = data["custom_engine_url"]
     # Connect to MongoDB
     if custom_engine_url is not None:
         client = MongoClient(custom_engine_url)

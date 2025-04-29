@@ -1,7 +1,7 @@
 from sqlalchemy import text
 import os
-from data_to_sql import generate_sql_database, load_json
-from general import check_files, make_mysql_engine
+from data_to_sql import generate_sql_database
+from general import check_files, make_mysql_engine, load_json
 
 # Update working directory
 current_directory = os.getcwd()

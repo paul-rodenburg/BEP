@@ -13,7 +13,6 @@
       "content_categories": "text",
       "contest_mode": "bool",
       "created_utc": "integer",
-      "distinguished": "text",
       "domain": "text",
       "downs": "integer",
       "edited": "text",
@@ -29,7 +28,6 @@
       "is_video": "bool",
       "locked": "bool",
       "media_only": "bool",
-      "name": "text",
       "no_follow": "bool",
       "num_comments": "integer",
       "num_crossposts": "integer",
@@ -64,6 +62,14 @@
         "references": { "table": "subreddit", "column": "display_name" }
       }
     ]
+  },
+  "distinguished_post": {
+    "columns": {
+      "id": "text",
+      "author_fullname": "text",
+      "distinguished": "text"
+    },
+    "primary_keys": ["id"]
   },
   "author": {
     "columns": {
@@ -266,14 +272,12 @@
       "collapsed": "text",
       "controversiality": "integer",
       "created_utc": "integer",
-      "distinguished": "text",
       "downs": "integer",
       "edited": "text",
       "gilded": "integer",
       "is_submitter": "bool",
       "link_id": "text",
       "locked": "bool",
-      "name": "text",
       "no_follow": "bool",
       "parent_id": "text",
       "permalink": "text",
@@ -298,6 +302,14 @@
         "references": { "table": "author", "column": "author_fullname" }
       }
     ]
+  },
+  "distinguished_comment": {
+    "columns": {
+      "id": "text",
+      "author_fullname": "text",
+      "distinguished": "text"
+    },
+    "primary_keys": ["id"]
   },
   "wiki": {
     "columns": {

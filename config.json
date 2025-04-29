@@ -75,11 +75,11 @@
   },
   "data_files_tables": {
     "data/submissions/RS_2025-01/RS_2025-01": {
-      "sql": ["post", "author"],
+      "sql": ["post", "author", "distinguished_post"],
       "mongodb": "post"
     },
     "data/comments/RC_2025-01/RC_2025-01": {
-      "sql": ["comment", "collapsed_comment"],
+      "sql": ["comment", "collapsed_comment", "distinguished_comment"],
       "mongodb": "comment"
     },
     "data/subreddits/subreddit_rules_2025-01/subreddit_rules_2025-01": {
