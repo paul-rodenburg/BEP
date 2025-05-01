@@ -1,8 +1,4 @@
-from datetime import datetime
 from typing import Any, Generator
-
-from pandas.core.indexes.base import ensure_index
-
 from classes.logger import Logger
 import pandas as pd
 import orjson as json
@@ -12,7 +8,7 @@ from itertools import chain
 from pandas import DataFrame
 from sqlalchemy import text
 from tqdm import tqdm
-from general import get_tables_database, get_database_type, capitalize_db_type, write_json
+from general import get_tables_database, get_database_type, write_json, capitalize_db_type
 from general import load_json_cached as load_json
 from line_counts import get_line_count_file
 import sys
@@ -57,6 +53,8 @@ def update_summary_log(db_type: str, data_file: str, start_time: datetime, end_t
     begin_time_formatted = start_time.strftime("%d %B %Y %H:%M.%S")
     end_time_formatted = end_time.strftime("%d %B %Y %H:%M.%S")
     time_elapsed_seconds = int(end_time.timestamp()) - int(start_time.timestamp())
+    if not isinstance(tables, list):
+        tables = [tables]
 
     info_to_add_log = {'start_time': int(start_time.timestamp()), 'end_time': int(end_time.timestamp()),
                        'start_time_formatted': begin_time_formatted, 'end_time_formatted': end_time_formatted,
