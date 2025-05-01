@@ -1,6 +1,8 @@
 import orjson as json
 import sqlite3
 from typing import Any, Mapping
+
+from conda_build.exceptions import indent
 from pymongo import MongoClient
 from collections import deque
 from pymongo.synchronous.database import Database
@@ -17,10 +19,14 @@ def load_json(file_path) -> dict | list:
 
     :return: a dict with the content of the json file
     """
-    with open(file_path, "r") as f:
+    if not os.path.isfile(file_path):
+        with open(file_path, 'wb') as f:
+            f.write(json.dumps({}))
+        return {}
+    with open(file_path, "r", encoding='utf-8') as f:
         content = f.read()
         if not content.strip():
-            return []
+            return {}
         return json.loads(content)
 
 

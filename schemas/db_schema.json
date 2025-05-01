@@ -124,7 +124,7 @@
       "user_sr_theme_enabled": "bool",
       "videostream_links_count": "integer"
     },
-    "primary_keys": ["id"],
+    "primary_keys": ["display_name"],
     "foreign_keys": [
       {
         "column": "display_name",

@@ -10,3 +10,6 @@
 .DS_Store
 character_lengths.json
 error.csv
+*/logs
+/logs
+error.xlsx

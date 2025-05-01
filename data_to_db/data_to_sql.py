@@ -1,15 +1,25 @@
 from datetime import datetime
+from typing import Any, Generator
+
+from pandas.core.indexes.base import ensure_index
+
+from classes.logger import Logger
 import pandas as pd
 import orjson as json
 import os
 import math
 from itertools import chain
+from pandas import DataFrame
 from sqlalchemy import text
 from tqdm import tqdm
 from general import get_tables_database, get_database_type, capitalize_db_type, write_json
 from general import load_json_cached as load_json
 from line_counts import get_line_count_file
-import re
+import sys
+import time
+from classes.cleaners import *
+from classes.BaseCleaner import BaseCleaner
+from datetime import datetime
 
 progress_bar = None
 clean_errors = 0
@@ -18,6 +28,43 @@ MAX_MYSQL_TEXT_LENGTH = 65_500 # Actual max length is 65,535 but we keep some sa
 
 # Load the schema in memory since it improved performance, reading the json many times takes time
 schema_global = None
+
+# Set up the logger
+os.makedirs("logs/summaries", exist_ok=True)
+time_now = time.time()
+log_basename = f'sql_{time_now}.txt'
+log_filename = f"logs/{log_basename}"
+logger = Logger(log_filename)
+sys.stdout = logger
+
+def update_summary_log(db_type: str, data_file: str, start_time: datetime, end_time: datetime, line_count: int, total_lines: int, tables: list, chunk_size: int, sql_writes: int):
+    """
+    Updates the summary log file.
+
+    :param db_type: database type
+    :param data_file: data file name
+    :param start_time: progress bar string
+    :param end_time: progress bar string
+    :param line_count: number of lines processed
+    :param total_lines: total number of lines in the data file
+    :param tables: list of tables processed
+    :param chunk_size: number of lines written to the sql database at a time
+    :param sql_writes: number of sql writes
+    """
+    summary_path = f"logs/summaries/summary_{db_type}.json"
+    current_summary = load_json(summary_path)
+
+    begin_time_formatted = start_time.strftime("%d %B %Y %H:%M.%S")
+    end_time_formatted = end_time.strftime("%d %B %Y %H:%M.%S")
+    time_elapsed_seconds = int(end_time.timestamp()) - int(start_time.timestamp())
+
+    info_to_add_log = {'start_time': int(start_time.timestamp()), 'end_time': int(end_time.timestamp()),
+                       'start_time_formatted': begin_time_formatted, 'end_time_formatted': end_time_formatted,
+                       'time_elapsed_seconds': time_elapsed_seconds, 'tables': tables,
+                       'line_count': line_count, 'chunk_size': chunk_size, 'total_lines': total_lines,
+                       'sql_writes': sql_writes}
+    current_summary[data_file] = info_to_add_log
+    write_json(current_summary, summary_path)
 
 def get_primary_key(table_name, schema_json_file="schemas/db_schema.json"):
     global schema_global
@@ -59,26 +106,7 @@ def get_table_columns(json_schema_path, table_name) -> list:
     return columns
 
 
-def process_line_rules(line: dict) -> list[dict]:
-    """
-    Helper method to process a line for the subreddit_rules table. Unpacks the rule dictionary.
-
-    :param line: Line to process.
-
-    :return: list of dictionaries, each containing one rule
-    """
-    lines_rules_cleaned = []
-    subreddit = line["subreddit"]
-    for rule in line["rules"]:
-        rule_id = f'{subreddit}_{rule["priority"]}'
-        rule = {"rule_id": rule_id, **rule}  # Ensure rule_id the first item (just for better visibility when viewing the database)
-        rule['subreddit'] = subreddit
-        lines_rules_cleaned.append(rule)
-
-    return lines_rules_cleaned
-
-
-def should_skip(line: dict, primary_keys: list) -> bool:
+def should_skip(line: dict|list[dict], primary_keys: list) -> bool:
     """
     Determines whether the line should be skipped based on the primary keys and other values.
     If any primary key value is None, the line is skipped. If all other values are None, the line is also skipped.
@@ -90,11 +118,9 @@ def should_skip(line: dict, primary_keys: list) -> bool:
 
     """
     # Check if any primary key value is None
+    if isinstance(line, list):
+        line = line[0]
     if any(line.get(key) is None for key in primary_keys):
-        print('if 1')
-        print(line)
-        print(primary_keys)
-        exit(1)
         return True
 
     # Get all other keys not in primary_keys
@@ -102,12 +128,29 @@ def should_skip(line: dict, primary_keys: list) -> bool:
 
     # If all other values are None
     if all(line.get(k) is None for k in other_keys):
-        print('if 2')
-        print(line)
-        print(primary_keys)
-        exit(1)
         return True
     return False
+
+def get_cleaner(table, db_type, ignored_author_names):
+    cleaners = {
+        'post': PostCleaner(),
+        'distinguished_post': DistinguishedPostCleaner(),
+        'author': AuthorCleaner(ignored_author_names),
+        'subreddit': SubredditCleaner(),
+        'subreddit_metadata': SubredditMetadataCleaner(),
+        'subreddit_settings': SubredditSettingsCleaner(),
+        'subreddit_media': SubredditMediaCleaner(),
+        'subreddit_permissions': SubredditPermissionsCleaner(),
+        'subreddit_comment_media': SubredditCommentMediaCleaner(),
+        'subreddit_rules': SubredditRulesCleaner(),
+        'removed': RemovedCleaner(),
+        'comment': CommentCleaner(),
+        'collapsed_comment': CollapsedCommentCleaner(),
+        'distinguished_comment': DistinguishedCommentCleaner(),
+        'wiki': WikiCleaner(db_type),
+        'revision_wiki': WikiRevisionCleaner(),
+    }
+    return cleaners.get(table, BaseCleaner())
 
 
 def clean_line(line_input, tables, table_columns, ignored_author_names, db_type) -> dict[str, list[dict]]|None:
@@ -136,45 +179,11 @@ def clean_line(line_input, tables, table_columns, ignored_author_names, db_type)
     for table in tables:
         line = line_input
         items_to_keep = table_columns[table]
-        if table == 'subreddit_rules':
-            line = process_line_rules(line)
-        if table in 'banned':
-            if line['banned_at_utc'] is None and line['banned_by'] is None:
-                continue
-        if table == 'removed':
-            if line['removal_reason'] is None and line['removed_by'] is None:
-                continue
-        if table == 'wiki':
-            try:
-                dt = datetime.fromisoformat(line['revision_date'].replace("Z", "+00:00"))
-            except Exception as e:
-                db_type_capitalized = capitalize_db_type(db_type)
-                print(f'[{db_type_capitalized}] KEY ERROR! REVISION DATE: {e}')
-                print(line)
-                exit(1)
-            epoch_time = int(dt.timestamp())
-            line['revision_date'] = epoch_time
-            pattern = r"/r/([^/]+)"
-            subreddit_match = re.search(pattern, line['path'])
-            if not subreddit_match:  # If the subreddit could not be found then return None since this data will be useless
-                continue
-            line['subreddit'] = subreddit_match.group(1)
-            line['content'] = line['content'][:500]
 
-        if table == 'post' or table == 'comment':  # To not get any postgreSQL errors
-            if int(line['edited']) == 0:
-                line['edited'] = False
-            else:
-                line['edited'] = True
-
-        if table == 'author':
-            if line['author'].strip().lower() in ignored_author_names:
-                continue
-        # If the distinguished is null (None) then the row should be disregarded.
-        # Only 'id' is here the primary key so should_skip does not work here since these table also have 'author_fullname' which is mostly not null
-        if table == 'distinguished_comment' or table == 'distinguished_post':
-            if line['distinguished'] is None:
-                continue
+        cleaner = get_cleaner(table, db_type, ignored_author_names)
+        line = cleaner.clean(line)
+        if line is None:
+            continue
 
         # If the value of the primary key(s) is/are null or all other values are null then skip this line
         if should_skip(line, get_primary_key(table)):
@@ -267,7 +276,8 @@ def process_table(data_file, tables, conn, table_columns, ignored_author_names, 
         print(f'[{db_type_capitalized}] Error! All chunks of {tables} were empty')
 
 
-def extract_lines(data_file, tables, table_columns, ignored_author_names, db_type, chunk_size) -> dict[str, pd.DataFrame]:
+def extract_lines(data_file, tables, table_columns, ignored_author_names, db_type, chunk_size) -> Generator[
+    dict[str, DataFrame], Any, None]:
     """
     Processes lines in the from the Reddit data file.
 
@@ -285,7 +295,7 @@ def extract_lines(data_file, tables, table_columns, ignored_author_names, db_typ
     for table_name in tables:
         lines_clean[table_name] = []
 
-
+    start_time = datetime.now()
     progress_bar_total = min(get_line_count_file(data_file), maximum_rows_database)
     db_type_capitalized = capitalize_db_type(db_type)
     progress_bar = tqdm(total=progress_bar_total, desc=f"[{db_type_capitalized}] Processing {len(tables)} table(s): {tables} (from {data_file.split('/')[-1]})")
@@ -311,9 +321,20 @@ def extract_lines(data_file, tables, table_columns, ignored_author_names, db_typ
             if lines_cleaned_count >= maximum_rows_database:
                 break
 
+    # Write progress bar results to log file
+    print(str(progress_bar))
+
     progress_bar.close()
     if lines_clean:
         yield process_cleaned_lines(lines_clean)
+
+    # Update log summary
+    end_time = datetime.now()
+    update_summary_log(db_type=db_type, data_file=data_file,
+                       start_time=start_time, end_time=end_time,
+                       line_count=lines_cleaned_count, total_lines=progress_bar_total,
+                       tables=tables, chunk_size=chunk_size,
+                       sql_writes=sql_count)
 
 
 def write_to_db(df, table, conn, len_tables, chunk_size=10_000):
@@ -791,3 +812,9 @@ def generate_sql_database(conn):
             for table in tables_to_process:
                 set_index(conn, table)
 
+    # Rename log file for clarity
+    logger.close()
+    sys.stdout = sys.__stdout__
+    if os.path.isfile(log_filename):  # Only rename when the file exists.
+                                      # If nothing is done then file does not exist for example
+        os.rename(log_filename, f'logs/FINISHED_{log_basename}')

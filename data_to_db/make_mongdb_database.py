@@ -4,7 +4,11 @@ from tqdm import tqdm
 from general import check_files, make_mongodb_engine
 from line_counts import get_line_count_file
 import os
-from data_to_sql import add_file_table_db_info, is_file_tables_added_db, get_primary_key
+from data_to_sql import add_file_table_db_info, is_file_tables_added_db, get_primary_key, load_json, write_json
+import sys
+from classes.logger import Logger
+import time
+from datetime import datetime
 
 # Update working directory
 current_directory = os.getcwd()
@@ -16,6 +20,13 @@ os.makedirs('databases', exist_ok=True)
 
 # Check if necessary data files exist
 check_files()
+
+# Set up the logger
+os.makedirs("logs/summaries", exist_ok=True)
+time_now = time.time()
+log_filename = f"logs/sql_{time_now}.txt"
+summary_filename = f"logs/summaries/summary_mongodb.json"
+sys.stdout = Logger(log_filename)
 
 # Load config
 with open('config.json', 'r', encoding='utf-8') as f:
@@ -47,6 +58,9 @@ for data_file, tables_file in data_files_tables.items():
             input(f"[MongoDB] Skipping collection '{collection_name}'.")
             continue  # Skip to next iteration if user says no
 
+    # Time measurements
+    start_time = datetime.now()
+
     # Add index
     pm = get_primary_key(collection_name)[0]
     collection.create_index([(pm, pymongo.ASCENDING)])
@@ -56,27 +70,48 @@ for data_file, tables_file in data_files_tables.items():
         buffer = []
         total_lines = min(get_line_count_file(data_file), maximum_rows_database)
         line_count = 0
-        with tqdm(total=total_lines, desc=f"Importing {collection_name} data to MongoDB collection {collection_name}", unit="docs") as pbar:
-            for line in file:
-                line_count += 1
-                if line.strip():  # Ignore empty lines
-                    buffer.append(json.loads(line))
+        pbar = tqdm(total=total_lines, desc=f"[MongoDB] Importing {collection_name} data to MongoDB collection {collection_name}", unit="docs")
+        for line in file:
+            line_count += 1
+            if line.strip():  # Ignore empty lines
+                buffer.append(json.loads(line))
 
-                if len(buffer) >= chunk_size:  # Insert when buffer reaches chunk size
-                    collection.insert_many(buffer)
-                    pbar.update(len(buffer))
-                    buffer.clear()  # Clear buffer after inserting
-
-                if line_count >= maximum_rows_database:  # Stop if there are maximum_rows_database written to avoid a very very large db
-                    if buffer:
-                        collection.insert_many(buffer)
-                        pbar.update(len(buffer))
-                        buffer.clear()  # Clear memory
-                    break
-
-            # Insert any remaining documents
-            if buffer:
+            if len(buffer) >= chunk_size:  # Insert when buffer reaches chunk size
                 collection.insert_many(buffer)
                 pbar.update(len(buffer))
+                buffer.clear()  # Clear buffer after inserting
+
+            if line_count >= maximum_rows_database:  # Stop if there are maximum_rows_database written to avoid a very very large db
+                if buffer:
+                    collection.insert_many(buffer)
+                    pbar.update(len(buffer))
+                    buffer.clear()  # Clear memory
+                break
+
+        # Insert any remaining documents
+        if buffer:
+            collection.insert_many(buffer)
+            pbar.update(len(buffer))
+
+        # Time measurements
+        end_time = datetime.now()
+        time_elapsed_seconds = int(end_time.timestamp()) - int(start_time.timestamp())
+
+        # Update json log
+        end_time_formatted = end_time.strftime("%d %B %Y %H:%M.%S")
+        begin_time_formatted = start_time.strftime("%d %B %Y %H:%M.%S")
+
+        current_log = load_json(summary_filename)
+        info_to_add_log = {'start_time': int(start_time.timestamp()), 'end_time': int(end_time.timestamp()),
+                           'start_time_formatted': begin_time_formatted, 'end_time_formatted': end_time_formatted,
+                           'time_elapsed_seconds': time_elapsed_seconds, 'collection_name': collection_name,
+                           'line_count': line_count, 'chunk_size': chunk_size, 'total_lines': total_lines}
+        current_log[data_file] = info_to_add_log
+        write_json(data=current_log, file_path=summary_filename)
+
     add_file_table_db_info(data_file, collection_name, db_info_file)
-print("Data import completed successfully!")
+
+# Save the tqdm bar (for timing)
+print(str(pbar))
+
+print("[MongoDB] Data import completed successfully!")
