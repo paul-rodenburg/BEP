@@ -675,8 +675,17 @@ def generate_create_table_statement(table_name, schema_json_file, db_type) -> st
         raise ValueError(f'[{db_type_capitalized}] Unsupported database type: {db_type}')
 
     for col_name, col_type in columns.items():
-        # Don't add PRIMARY KEY here if there are multiple keys
+
+        # If the database is mysql and the current column is the only primary key then mysql requires
+        # that we set a maximum length of the primary keys (always type varchar).
+        # Since the primary key value is always relatively short we can pick 255 as max length
+        # For the values of non-primary keys this is not necessary
+        if db_type == 'mysql' and col_name in primary_keys and len(primary_keys) == 1 and col_type.lower() == 'text':
+            col_type = 'VARCHAR(255)'
+
         line = f'  {quotation_mark_table_statements}{col_name}{quotation_mark_table_statements} {col_type}'
+
+        # Don't add PRIMARY KEY here if there are multiple keys
         if isinstance(primary_keys, list) and len(primary_keys) == 1 and col_name in primary_keys:
             line += " PRIMARY KEY"
         lines.append(line)

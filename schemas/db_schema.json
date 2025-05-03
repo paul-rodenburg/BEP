@@ -317,7 +317,7 @@
       "subreddit": "text",
       "content": "text",
       "retrieved_on": "integer",
-      "revision_date": "date"
+      "revision_date": "integer"
     },
     "primary_keys": ["path"],
     "foreign_keys": [
