@@ -1,6 +1,6 @@
 from sqlalchemy import text
 import os
-from data_to_sql import generate_sql_database
+from data_to_sql import main
 from general import check_files, make_mysql_engine, load_json
 
 # Update working directory
@@ -26,5 +26,5 @@ with engine.connect() as conn:
 
 # Make engine again if the database needed to be created
 engine = make_mysql_engine(DB_NAME)
-generate_sql_database(engine)
+main(engine)
 

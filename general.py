@@ -7,7 +7,8 @@ from pymongo.synchronous.database import Database
 from sqlalchemy import Engine, text, create_engine
 import subprocess
 import os
-
+from classes.DBType import DBTypes, DBType
+from datetime import datetime
 
 def load_json(file_path) -> dict | list:
     """
@@ -70,31 +71,35 @@ def extract_line(line_nr, content_file_path) -> str | None:
     return None
 
 
-def get_database_type(conn) -> str:
+def get_database_type(conn) -> DBType:
     """
     Gets the database type based on the connection.
 
     :param conn: connection to the database
     :raises ValueError: if the connection type is not supported
-    :return: the database type ('postgresql' or 'mysql' or 'sqlite')
+    :return: DBType instance
     """
+    db_type = DBType()
+
     if isinstance(conn, sqlite3.Connection):  # SQLite
-        return 'sqlite'
+        db_type.set_type(DBTypes.SQLITE)
+        return db_type
 
     elif isinstance(conn, Engine):  # PostgreSQL or MySQL
-        db_type = conn.dialect.name  # Detect database type
-        match db_type:
-            case 'postgresql':
-                return 'postgresql'
-            case 'mysql':
-                return 'mysql'
-            case 'sqlite':
-                return 'sqlite'
+        dialect_name = conn.dialect.name
+        match dialect_name:
+            case "postgresql":
+                db_type.set_type(DBTypes.POSTGRESQL)
+            case "mysql":
+                db_type.set_type(DBTypes.MYSQL)
+            case "sqlite":
+                db_type.set_type(DBTypes.SQLITE)
             case _:
-                raise ValueError(f"Only SQLite, PostgreSQL, and MySQL connections are supported, not {db_type}")
+                raise ValueError(f"Unsupported SQL dialect: {dialect_name}")
+        return db_type
 
     else:
-        raise ValueError(f"Only SQLite, PostgreSQL, and MySQL connections are supported, not {type(conn)}")
+        raise ValueError(f"Unsupported connection type: {type(conn)}")
 
 
 def get_tables_database(engine):
@@ -107,19 +112,24 @@ def get_tables_database(engine):
     """
     db_type = get_database_type(engine)
     match db_type:
-        case 'sqlite':
+        case DBTypes.SQLITE:
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table';"))
             tables = result.fetchall()
             return [table[0] for table in tables]
-        case 'mysql':
+        case DBTypes.MYSQL:
             with engine.connect() as conn:
                 result = conn.execute(text("SHOW TABLES"))
             return [row[0] for row in result.fetchall()]
-        case 'postgresql':
+        case DBTypes.POSTGRESQL:
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public';"))
             return [row[0] for row in result.fetchall()]
+        case DBTypes.MONGODB:
+            db = make_mongodb_engine()
+            collections = list(db.list_collection_names())
+            db.client.close()
+            return collections
         case _:
             raise ValueError(f'Unknown database type: {db_type}')
 
@@ -248,22 +258,36 @@ def make_mongodb_engine() -> Database[Mapping[str, Any] | Any]:
 
     return db
 
-
-def capitalize_db_type(db_type: str) -> str:
+def update_summary_log(db_type: DBType, data_file: str, start_time: datetime, end_time: datetime, line_count: int, total_lines: int, tables: list|None, chunk_size: int, sql_writes: int|None):
     """
-    Capitalizes the name of a database type.
+    Updates the summary log file.
 
-    :param db_type: The name of the database type.
-    :return: The capitalized name of the database type.
+    :param db_type: database type
+    :param data_file: data file name
+    :param start_time: progress bar string
+    :param end_time: progress bar string
+    :param line_count: number of lines processed
+    :param total_lines: total number of lines in the data file
+    :param tables: list of tables processed
+    :param chunk_size: number of lines written to the sql database at a time
+    :param sql_writes: number of sql writes
     """
-    # Make sure the db type is lower case and stripped
-    db_type = db_type.lower().strip()
+    summary_path = f"logs/summaries/summary_{db_type.to_string()}.json"
+    current_summary = load_json(summary_path)
 
-    if db_type == 'sqlite':
-        return 'SQLite'
-    elif db_type == 'postgresql':
-        return 'PostgreSQL'
-    elif db_type == 'mysql':
-        return 'MySQL'
-    else:
-        return f"Unknown {db_type}'"
+    begin_time_formatted = start_time.strftime("%d %B %Y %H:%M.%S")
+    end_time_formatted = end_time.strftime("%d %B %Y %H:%M.%S")
+    time_elapsed_seconds = int(end_time.timestamp()) - int(start_time.timestamp())
+    if not isinstance(tables, list):
+        tables = [tables]
+
+    info_to_add_log = {'start_time': int(start_time.timestamp()), 'end_time': int(end_time.timestamp()),
+                       'start_time_formatted': begin_time_formatted, 'end_time_formatted': end_time_formatted,
+                       'time_elapsed_seconds': time_elapsed_seconds, 'tables': tables,
+                       'line_count': line_count, 'chunk_size': chunk_size, 'total_lines': total_lines,
+                       'sql_writes': sql_writes}
+    if db_type.is_type(DBTypes.MONGODB):
+        del info_to_add_log['tables']
+        del info_to_add_log['sql_writes']
+    current_summary[data_file] = info_to_add_log
+    write_json(current_summary, summary_path)

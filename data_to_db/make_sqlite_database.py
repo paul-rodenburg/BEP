@@ -1,4 +1,4 @@
-from data_to_sql import generate_sql_database
+from data_to_sql import main
 import os
 from general import check_files, make_sqlite_engine
 
@@ -14,4 +14,4 @@ os.makedirs('databases', exist_ok=True)
 check_files()
 
 engine = make_sqlite_engine()
-generate_sql_database(engine)
+main(engine)

@@ -1,7 +1,7 @@
 import json
 import pymongo
 from tqdm import tqdm
-from general import check_files, make_mongodb_engine
+from general import check_files, make_mongodb_engine, update_summary_log
 from line_counts import get_line_count_file
 import os
 from data_to_sql import add_file_table_db_info, is_file_tables_added_db, get_primary_key, load_json, write_json
@@ -9,6 +9,7 @@ import sys
 from classes.logger import Logger
 import time
 from datetime import datetime
+from classes.DBType import DBType, DBTypes
 
 # Update working directory
 current_directory = os.getcwd()
@@ -38,24 +39,26 @@ with open('config.json', 'r', encoding='utf-8') as f:
 
 db = make_mongodb_engine()
 db_info_file = 'databases/db_info_mongodb.json'
+db_type = DBType()
+db_type.set_type(DBTypes.MONGODB)
 
 for data_file, tables_file in data_files_tables.items():
     collection_name = tables_file['mongodb']
     if not is_file_tables_added_db(data_file, collection_name, db_info_file):
-        input(f'[MongoDB] Skipping {collection_name}...')
+        input(f'[{db_type.to_string_capitalized()}] Skipping {collection_name}...')
         continue
     collection = db[collection_name]  # Collection Name
 
     # Check if collection exists
     if collection_name in db.list_collection_names():
 
-        response = input(f"[MongoDB] Collection '{collection_name}' already exists. Remove it? (y/n): ")
+        response = input(f"[{db_type.to_string_capitalized()}] Collection '{collection_name}' already exists. Remove it? (y/n): ")
 
         if response == "y":
             collection.drop()  # Remove collection
-            input(f"[MongoDB] Collection '{collection_name}' deleted.")
+            input(f"[{db_type.to_string_capitalized()}] Collection '{collection_name}' deleted.")
         elif response == "n":
-            input(f"[MongoDB] Skipping collection '{collection_name}'.")
+            input(f"[{db_type.to_string_capitalized()}] Skipping collection '{collection_name}'.")
             continue  # Skip to next iteration if user says no
 
     # Time measurements
@@ -70,9 +73,10 @@ for data_file, tables_file in data_files_tables.items():
         buffer = []
         total_lines = min(get_line_count_file(data_file), maximum_rows_database)
         line_count = 0
-        pbar = tqdm(total=total_lines, desc=f"[MongoDB] Importing {collection_name} data to MongoDB collection {collection_name}", unit="docs")
+        pbar = tqdm(total=total_lines, desc=f"[{db_type.to_string_capitalized()}] Importing {collection_name} data to MongoDB collection {collection_name}", unit="docs")
         for line in file:
             line_count += 1
+            pbar.update(1)
             if line.strip():  # Ignore empty lines
                 buffer.append(json.loads(line))
 
@@ -95,23 +99,16 @@ for data_file, tables_file in data_files_tables.items():
 
         # Time measurements
         end_time = datetime.now()
-        time_elapsed_seconds = int(end_time.timestamp()) - int(start_time.timestamp())
 
-        # Update json log
-        end_time_formatted = end_time.strftime("%d %B %Y %H:%M.%S")
-        begin_time_formatted = start_time.strftime("%d %B %Y %H:%M.%S")
+        update_summary_log(db_type=db_type, data_file=data_file,
+                           start_time=start_time, end_time=end_time,
+                           line_count=line_count, total_lines=total_lines,
+                           tables=None, chunk_size=chunk_size, sql_writes=None)
 
-        current_log = load_json(summary_filename)
-        info_to_add_log = {'start_time': int(start_time.timestamp()), 'end_time': int(end_time.timestamp()),
-                           'start_time_formatted': begin_time_formatted, 'end_time_formatted': end_time_formatted,
-                           'time_elapsed_seconds': time_elapsed_seconds, 'collection_name': collection_name,
-                           'line_count': line_count, 'chunk_size': chunk_size, 'total_lines': total_lines}
-        current_log[data_file] = info_to_add_log
-        write_json(data=current_log, file_path=summary_filename)
 
     add_file_table_db_info(data_file, collection_name, db_info_file)
 
 # Save the tqdm bar (for timing)
 print(str(pbar))
 
-print("[MongoDB] Data import completed successfully!")
+print(f"[{db_type.to_string_capitalized()}] Data import completed successfully!")

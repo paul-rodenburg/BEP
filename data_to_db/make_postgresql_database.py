@@ -1,5 +1,5 @@
 import os
-from data_to_sql import generate_sql_database
+from data_to_sql import main
 from general import check_files, make_postgres_engine
 
 # Update working directory
@@ -16,5 +16,5 @@ check_files()
 # Make engine
 engine = make_postgres_engine()
 
-generate_sql_database(engine)
+main(engine)
 

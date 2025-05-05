@@ -2,8 +2,7 @@ from classes.BaseCleaner import BaseCleaner
 from datetime import datetime
 import re
 import hashlib
-from general import capitalize_db_type
-
+from classes.DBType import DBType, DBTypes
 
 class SubredditRulesCleaner(BaseCleaner):
     def clean(self, line: dict) -> list[dict]:
@@ -33,14 +32,14 @@ class RemovedCleaner(BaseCleaner):
         return line
 
 class WikiCleaner(BaseCleaner):
-    def __init__(self, db_type):
+    def __init__(self, db_type: DBType):
         self.db_type = db_type
 
     def clean(self, line):
         try:
             dt = datetime.fromisoformat(line['revision_date'].replace("Z", "+00:00"))
         except Exception as e:
-            print(f'[{capitalize_db_type(self.db_type)}] KEY ERROR! REVISION DATE: {e}')
+            print(f'[{self.db_type.to_string()}] KEY ERROR! REVISION DATE: {e}')
             print(line)
             exit(1)
 

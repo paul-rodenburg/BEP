@@ -1,0 +1,26 @@
+{
+  "simple": {
+    "query_type": "simple",
+    "queries": [
+      "SELECT DISTINCT author_fullname FROM author",
+      "",
+      ""
+    ]
+  },
+  "joins": {
+    "query_type": "joins",
+    "queries": [
+      "SELECT DISTINCT author_fullname FROM author",
+      "",
+      ""
+    ]
+  },
+  "advanced": {
+    "query_type": "advanced",
+    "queries": [
+      "SELECT DISTINCT author_fullname FROM author",
+      "",
+      ""
+    ]
+  }
+}
