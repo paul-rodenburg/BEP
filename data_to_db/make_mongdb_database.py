@@ -21,7 +21,6 @@ os.makedirs('databases', exist_ok=True)
 
 # Check if necessary data files exist
 check_files()
-
 # Set up the logger
 os.makedirs("logs/summaries", exist_ok=True)
 time_now = time.time()
@@ -45,10 +44,9 @@ db_type.set_type(DBTypes.MONGODB)
 for data_file, tables_file in data_files_tables.items():
     collection_name = tables_file['mongodb']
     if not is_file_tables_added_db(data_file, collection_name, db_info_file):
-        input(f'[{db_type.to_string_capitalized()}] Skipping {collection_name}...')
+        print(f'[{db_type.to_string_capitalized()}] Skipping {collection_name}...')
         continue
     collection = db[collection_name]  # Collection Name
-
     # Check if collection exists
     if collection_name in db.list_collection_names():
 
@@ -56,14 +54,13 @@ for data_file, tables_file in data_files_tables.items():
 
         if response == "y":
             collection.drop()  # Remove collection
-            input(f"[{db_type.to_string_capitalized()}] Collection '{collection_name}' deleted.")
+            print(f"[{db_type.to_string_capitalized()}] Collection '{collection_name}' deleted.")
         elif response == "n":
-            input(f"[{db_type.to_string_capitalized()}] Skipping collection '{collection_name}'.")
+            print(f"[{db_type.to_string_capitalized()}] Skipping collection '{collection_name}'.")
             continue  # Skip to next iteration if user says no
 
     # Time measurements
     start_time = datetime.now()
-
     # Add index
     pm = get_primary_key(collection_name)[0]
     collection.create_index([(pm, pymongo.ASCENDING)])
@@ -104,6 +101,7 @@ for data_file, tables_file in data_files_tables.items():
                            start_time=start_time, end_time=end_time,
                            line_count=line_count, total_lines=total_lines,
                            tables=None, chunk_size=chunk_size, sql_writes=None)
+    pbar.close()
 
 
     add_file_table_db_info(data_file, collection_name, db_info_file)
