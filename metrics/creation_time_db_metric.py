@@ -28,6 +28,8 @@ def get_total_creation_time(db_type: str) -> int:
     creation_time = 0
     for data_file in log.keys():
         creation_time += log[data_file]['time_elapsed_seconds']
+    if creation_time == 0:  # Then the database is not already generated, so return -1
+        return -1
     return creation_time
 
 def get_datafiles(db_type: str) -> list:
