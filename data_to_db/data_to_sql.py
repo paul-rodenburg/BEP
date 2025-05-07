@@ -9,7 +9,7 @@ from itertools import chain
 from pandas import DataFrame
 from sqlalchemy import text, Engine, Connection
 from tqdm import tqdm
-from general import get_tables_database, get_database_type, write_json, update_summary_log
+from general import get_tables_database, write_json, update_summary_log
 from general import load_json_cached as load_json
 from line_counts import get_line_count_file
 import sys
@@ -21,9 +21,9 @@ from datetime import datetime
 progress_bar = None
 clean_errors = 0
 maximum_rows_database = 0
-MAX_MYSQL_TEXT_LENGTH = 65_500 # Actual max length is 65,535 but we keep some safety margin
+MAX_MYSQL_TEXT_LENGTH = 65_500 # The actual max length is 65,535, but we keep some safety margin
 
-# Load the schema in memory since it improved performance, reading the json many times takes time
+# Load the schema in memory since it improved performance, reading the JSON many times takes time
 schema_global = None
 
 
@@ -42,11 +42,11 @@ def get_primary_key(table_name, schema_json_file="schemas/db_schema.json"):
 
 def unnest(lst):
     """
-    Unnests a list, however if a list is not nested it will not unnest it to a list of single characters.
+    Unnests a list, however, if a list is not nested, it will not unnest it to a list of single characters.
 
-    :param lst: list to unnest
+    :param lst: List to unnest
 
-    :return: unnested list
+    :return: Unnested list
     """
     if all(not isinstance(i, list) for i in lst):
         return lst  # Return as-is if it's already flat
@@ -57,10 +57,10 @@ def get_table_columns(json_schema_path, table_name) -> list:
     """
     Gets the table columns from a sqlite database file.
 
-    :param json_schema_path: Path to the json schema file.
+    :param json_schema_path: Path to the JSON schema file.
     :param table_name: Name of the table to extract columns from.
 
-    :return: list of table names in the sqlite database file.
+    :return: List of table names in the sqlite database file.
     """
     schema = load_json(json_schema_path)
     columns = list(schema[table_name]['columns'].keys())
@@ -72,8 +72,8 @@ def should_skip(line: dict|list[dict], primary_keys: list) -> bool:
     Determines whether the line should be skipped based on the primary keys and other values.
     If any primary key value is None, the line is skipped. If all other values are None, the line is also skipped.
 
-    :param line: line to check.
-    :param primary_keys: primary keys to check.
+    :param line: Line to check.
+    :param primary_keys: Primary keys to check.
 
     :return: True if the line should be skipped, False otherwise.
 
@@ -93,6 +93,14 @@ def should_skip(line: dict|list[dict], primary_keys: list) -> bool:
     return False
 
 def get_cleaner(table: str, db_type: DBType, ignored_author_names: set) -> BaseCleaner:
+    """
+    Returns the cleaner for the given table.
+
+    :param table: Table name
+    :param db_type: database type
+    :param ignored_author_names: author names to ignore
+    :return: cleaner for the given table.
+    """
     cleaners = {
         'post': PostCleaner(),
         'distinguished_post': DistinguishedPostCleaner(),
@@ -118,12 +126,13 @@ def clean_line(line_input: str, tables: list, table_columns: dict, ignored_autho
     """
     Gets a line and cleans it for all the tables.
 
-    :param line_input: line to clean
+    :param line_input: Line to clean
     :param tables: tables for the line
     :param table_columns: columns for the tables
     :param ignored_author_names: author names to ignore
     :param db_type: database type
-    :return: A dict with as key the table name and value the cleaned line for that table. If there is an error with the line, returns None.
+    :return: A dict with as a key the table name and value the cleaned line for that table.
+    If there is an error with the line, it returns None.
     """
     global clean_errors
 
@@ -146,7 +155,7 @@ def clean_line(line_input: str, tables: list, table_columns: dict, ignored_autho
         if line is None:
             continue
 
-        # If the value of the primary key(s) is/are null or all other values are null then skip this line
+        # If the value of the primary key(s) is/are null or all other values are null, then skip this line
         if should_skip(line, get_primary_key(table)):
             continue
         if not isinstance(line, list):
@@ -200,7 +209,7 @@ def process_cleaned_lines(cleaned_lines_dct) -> dict[str, pd.DataFrame]:
 
         df = pd.DataFrame(cleaned_lines_dct[table_name])
 
-        # clean up weird data types and null characters
+        # Clean up strange data types and null characters
         df = df.map(lambda x: str(x) if isinstance(x, (list, dict)) else x)
         df = df.map(lambda x: x.replace("\x00", "") if isinstance(x, str) else x)
 
@@ -211,25 +220,26 @@ def process_cleaned_lines(cleaned_lines_dct) -> dict[str, pd.DataFrame]:
 
 sql_count = 0
 
-def process_table(data_file: str, tables: list, conn: Engine, table_columns: dict, ignored_author_names: set, chunk_size: int):
+def process_table(data_file: str, tables: list, engine: Engine,
+                  table_columns: dict, ignored_author_names: set, chunk_size: int, db_type: DBType):
     """
     Processes tables, so writing the data to a database.
 
-    :param data_file: path to data file
+    :param data_file: Path to data file
     :param tables: tables to process
-    :param conn: database connection
+    :param engine: database connection
     :param table_columns: dictionary containing tables names as keys and the value are the column names corresponding to the tables
     :param ignored_author_names: author names to ignore.
-    :param chunk_size: number of lines to read at a time
+    :param chunk_size: Number of lines to read at a time
+    :param db_type: database type
     """
     global sql_count
 
     added_count = 0
-    db_type = get_database_type(conn)
     for chunk_data in extract_lines(data_file, tables, table_columns, ignored_author_names, db_type, chunk_size):
         for table_name, data in chunk_data.items():
             if data is not None and not data.empty:
-                write_to_db(data, table_name, conn, len(chunk_data), chunk_size=chunk_size)
+                write_to_db(data, table_name, engine, len(chunk_data), chunk_size=chunk_size, db_type=db_type)
                 added_count += 1
     sql_count = 0  # Reset count for the progress bar
     if added_count == 0:
@@ -239,14 +249,15 @@ def process_table(data_file: str, tables: list, conn: Engine, table_columns: dic
 def extract_lines(data_file: str, tables: list, table_columns: dict, ignored_author_names: set, db_type: DBType, chunk_size: int) -> Generator[
     dict[str, DataFrame], Any, None]:
     """
-    Processes lines in the from the Reddit data file.
+    Processes lines from the Reddit data file.
 
-    :param data_file: path to the Reddit data file
-    :param tables: tables to process
-    :param table_columns: dictionary containing tables names as keys and the value are the column names corresponding to the tables
-    :param ignored_author_names: author names to ignore
-    :param db_type: database type
-    :param chunk_size: number of lines to read at a time
+    :param data_file: Path to the Reddit data file
+    :param tables: Tables to process
+    :param table_columns: Dictionary containing tables names as keys and the value are the column names
+    corresponding to the tables
+    :param ignored_author_names: Author names to ignore
+    :param db_type: The database type
+    :param chunk_size: Number of lines to read at a time
 
     :return: A dict with as a key the table name and value the cleaned lines for that table in pandas DataFrame
     """
@@ -280,7 +291,7 @@ def extract_lines(data_file: str, tables: list, table_columns: dict, ignored_aut
             if lines_cleaned_count >= maximum_rows_database:
                 break
 
-    # Write progress bar results to log file
+    # Write progress bar results to log a file
     print(str(progress_bar))
 
     progress_bar.close()
@@ -296,14 +307,15 @@ def extract_lines(data_file: str, tables: list, table_columns: dict, ignored_aut
                        sql_writes=sql_count)
 
 
-def write_to_db(df: pd.DataFrame, table: str, conn: Engine, len_tables: int, chunk_size: int=10_000):
+def write_to_db(df: pd.DataFrame, table: str, conn: Engine, len_tables: int, db_type: DBType, chunk_size: int=10_000):
     """
-    Write dataframe to database.
+    Write dataframe to the database.
 
-    :param df: pandas DataFrame
+    :param df: Pandas DataFrame
     :param table: table name
     :param conn: database connection
     :param len_tables: number of tables that are currently being processed (only used to display in tqdm progress bar)
+    :param db_type: database type, either sqlite, mysql, or PostgreSQL
     :param chunk_size: number of lines to read at a time
     """
     global sql_count, progress_bar
@@ -311,7 +323,6 @@ def write_to_db(df: pd.DataFrame, table: str, conn: Engine, len_tables: int, chu
         df.to_sql(table, conn, if_exists="append", index=False, chunksize=5000)
     except Exception as e:
         df.to_csv('error.csv', index=False)
-        db_type = get_database_type(conn)
         print(f"\n[{db_type.to_string_capitalized()}] Error writing to database: {e}. df written to error.csv.")
         exit(1)
     sql_count += 1
@@ -320,13 +331,13 @@ def write_to_db(df: pd.DataFrame, table: str, conn: Engine, len_tables: int, chu
 
 def is_file_tables_added_db(data_file, tables, db_info_file) -> list:
     """
-    Gets the table names of the table names that are not (fully) processed, so not (competely) added to the database.
+    Gets the table names of the table names that are not (fully) processed, so not (completely) added to the database.
 
-    :param data_file: path to the reddit data file
+    :param data_file: Path to the reddit data file
     :param tables: list of table names to check
-    :param db_info_file: path to the database info file
+    :param db_info_file: the path to the database info file
 
-    :return: list of table names that need to be added to the database
+    :return: List of table names that need to be added to the database
     """
     if os.path.isfile(db_info_file):
         data = load_json(db_info_file)
@@ -338,17 +349,17 @@ def is_file_tables_added_db(data_file, tables, db_info_file) -> list:
                 missing_tables = list(set(tables) - set(obj['success_tables']))
                 return missing_tables
 
-    # If file doesn't exist or file not found, return all tables
+    # If a file doesn't exist or the file not found, return all tables
     return tables
 
 
 def add_file_table_db_info(data_file, tables, db_info_file):
     """
-    Adds content to the success_tables in the database specific json file.
+    Adds content to the success_tables in the database-specific JSON file.
 
-    :param data_file: path to the reddit data file
+    :param data_file: Path to the reddit data file
     :param tables: table names to add to the success_tables field in the db_info_file
-    :param db_info_file: path to the json db info file
+    :param db_info_file: path to the JSON db info file
     """
     if not os.path.isfile(db_info_file):
         write_json([], db_info_file)
@@ -372,7 +383,7 @@ def get_tables_to_skip(json_data) -> set:
     """
     Gets the table names of tables that already do not include any duplicates
 
-    :param json_data: data of the database specific info
+    :param json_data: data of the database-specific info
     """
     tables_to_skip = set()
     for entry in json_data:
@@ -382,9 +393,9 @@ def get_tables_to_skip(json_data) -> set:
 
 def update_json_with_table_duplicates(json_file, table_name, data_file):
     """
-    Adds the table names of tables where duplicates are removed to the database specific info json file.
+    Adds the table names of tables where duplicates are removed to the database-specific info JSON file.
 
-    :param json_file: path to json file with database specific info
+    :param json_file: Path to the JSON file with database-specific info
     :param table_name: table name of table where duplicates are removed
     :param data_file: path to the file with reddit data
 
@@ -400,9 +411,10 @@ def update_json_with_table_duplicates(json_file, table_name, data_file):
 
 def clean_json_duplicates(json_file):
     """
-    Cleans the json duplicates field, ensures that a table name is only in the duplicates_removed field if in success_tables.
+    Cleans the JSON duplicates field,
+    ensures that a table name is only in the duplicates_removed field if in success_tables.
 
-    :param json_file: the path to the json with database specific info
+    :param json_file: The path to the JSON with database-specific info
     """
     json_data = load_json(json_file)
     for entry in json_data:
@@ -412,18 +424,18 @@ def clean_json_duplicates(json_file):
 
 delete_all = False
 
-def delete_table_db(table_name: str, engine: Engine):
-    global delete_all
-
+def delete_table_db(table_name: str, engine: Engine, db_type: DBType):
     """
     If a table exists, asks the user to delete it. If the table does not exist, noting is done.
 
-    :param table_name: name of the table to delete
-    :param engine: connection to the database
+    :param table_name: Name of the table to delete
+    :param engine: Connection to the database :param db_type:  type, either sqlite, mysql, or postgresql
+    :param db_type: Database type, either sqlite, mysql, or PostgreSQL
 
-    :raises ValueError: if the connection type is not supported
+    :raises ValueError: If the connection type is not supported
     """
-    db_type = get_database_type(engine)
+    # Global variables
+    global delete_all
 
     with engine.connect() as conn:
         if table_exists(conn, table_name, db_type):
@@ -462,11 +474,11 @@ def table_exists(connection: Connection, table_name: str, db_type: DBType):
     """
     Checks if a table exists in the database.
 
-    :param connection: connection to the database
-    :param table_name: name of the table
-    :param db_type: database type
+    :param connection: Connection to the database
+    :param table_name: Name of the table
+    :param db_type: Database type
 
-    :raises ValueError: if the database type is not supported
+    :raises ValueError: If the database type is not supported
 
     :return: True if the table exists, False otherwise
     """
@@ -497,18 +509,18 @@ def table_exists(connection: Connection, table_name: str, db_type: DBType):
         raise ValueError(f'[{db_type.to_string_capitalized()}] Unknown database type: {db_type}')
 
 
-def set_index(conn, table_name):
+def set_index(engine: Engine, table_name: str, db_type: DBType):
     """
     Sets the index of a database table, ensuring efficient lookups.
     If the index already exists, it will be recreated.
 
-    :param conn: connection to the database
+    :param engine: Database engine
     :param table_name: the name of the table you want to set the index for
+    :param db_type: the type of the database, either sqlite, mysql, or postgresql
 
-    :raises ValueError: if the connection type is not supported
+    :raises ValueError: If the connection type is not supported
     """
     pms = get_primary_key(table_name)
-    db_type = get_database_type(conn)
 
     print(f"[{db_type.to_string_capitalized()}] Setting index for table '{table_name}' and columns {pms}...")
     
@@ -516,16 +528,16 @@ def set_index(conn, table_name):
     for pm in pms:
         if db_type.is_type(DBTypes.SQLITE):
             # SQLite doesn't use 'connect()', just use the provided 'conn'
-            with conn.connect() as engine:
+            with engine.connect() as conn:
                 # Drop the index if it already exists
-                engine.execute(text(f"DROP INDEX IF EXISTS index_{pm}"))
+                conn.execute(text(f"DROP INDEX IF EXISTS index_{pm}"))
                 # Create the index
-                engine.execute(text(f"CREATE INDEX index_{pm} ON {table_name} ({pm})"))
+                conn.execute(text(f"CREATE INDEX index_{pm} ON {table_name} ({pm})"))
 
         elif db_type.is_type(DBTypes.MYSQL):
-            with conn.connect() as engine:
+            with engine.connect() as conn:
                 # Check if the table exists
-                if not table_exists(engine, table_name, db_type):
+                if not table_exists(conn, table_name, db_type):
                     print(f"Table '{table_name}' does not exist. Skipping index creation.")
                     return
 
@@ -534,13 +546,13 @@ def set_index(conn, table_name):
                     SELECT 1 FROM information_schema.statistics
                     WHERE table_name = :table_name AND index_name = :index_name
                 """)
-                result = engine.execute(index_check_query,
-                                        {'table_name': table_name, 'index_name': f'index_{pm}'}).fetchone()
+                result = conn.execute(index_check_query,
+                                      {'table_name': table_name, 'index_name': f'index_{pm}'}).fetchone()
 
                 # Drop the index if it exists
                 if result:
                     drop_index_query = text(f"DROP INDEX index_{pm} ON {table_name}")
-                    engine.execute(drop_index_query)
+                    conn.execute(drop_index_query)
 
                 # Check if the column is of type TEXT or BLOB
                 column_type_query = text(f"""
@@ -548,8 +560,8 @@ def set_index(conn, table_name):
                     FROM INFORMATION_SCHEMA.COLUMNS
                     WHERE TABLE_NAME = :table_name AND COLUMN_NAME = :column_name
                 """)
-                column_type = engine.execute(column_type_query,
-                                             {'table_name': table_name, 'column_name': pm}).fetchone()
+                column_type = conn.execute(column_type_query,
+                                           {'table_name': table_name, 'column_name': pm}).fetchone()
 
                 # If the column is TEXT or BLOB, we need to specify the length for the index
                 if column_type and ('text' in column_type[0].lower() or 'blob' in column_type[0].lower()):
@@ -558,16 +570,16 @@ def set_index(conn, table_name):
                     create_index_query = text(f"CREATE INDEX index_{pm} ON {table_name} ({pm})")
 
                 # Create the index
-                engine.execute(create_index_query)
-                engine.commit()
+                conn.execute(create_index_query)
+                conn.commit()
 
         elif db_type.is_type(DBTypes.POSTGRESQL):
-            with conn.connect() as engine:
+            with engine.connect() as conn:
                 # Drop the index if it already exists
-                engine.execute(text(f"DROP INDEX IF EXISTS index_{pm}"))
+                conn.execute(text(f"DROP INDEX IF EXISTS index_{pm}"))
                 # Create the index
-                engine.execute(text(f"CREATE INDEX index_{pm} ON {table_name} ({pm})"))
-                engine.commit()
+                conn.execute(text(f"CREATE INDEX index_{pm} ON {table_name} ({pm})"))
+                conn.commit()
 
         else:
             raise ValueError(f'[{db_type.to_string_capitalized()}] Unknown database type: {db_type}')
@@ -575,7 +587,7 @@ def set_index(conn, table_name):
 def get_file_from_table_name(table_name: str) -> str|None:
     """
     Gets the data file path corresponding to the given table name.
-    :param table_name: name of table in database to find the data file for
+    :param table_name: Name of table in the database to find the data file for
     :return: the path to the data file corresponding to the given table name.
     """
     config_data_tables = load_json('config.json')['data_files_tables']
@@ -589,11 +601,11 @@ def get_file_from_table_name(table_name: str) -> str|None:
 
 def generate_create_table_statement(table_name: str, schema_json_file: str, db_type: DBType) -> str:
     """
-    Makes the CREATE TABLE statements from the json schema file.
+    Makes the CREATE TABLE statements from the JSON schema file.
 
     :param schema_json_file: JSON schema file
-    :param table_name: name of the table
-    :param db_type: type of db (sqlite, postgreSQL, or mysql)
+    :param table_name: Name of the table
+    :param db_type: Type of db (sqlite, postgreSQL, or mysql)
 
     :return: CREATE TABLE statement
     """
@@ -603,7 +615,7 @@ def generate_create_table_statement(table_name: str, schema_json_file: str, db_t
         raise ValueError(f"Table '{table_name}' not found in the schema.")
 
     table = schema[table_name]
-    # MySQL has shorter character length for TEXT than other databases, so change it to LONGTEXT if needed
+    # MySQL has a shorter character length for TEXT than other databases, so change it to LONGTEXT if needed
     if db_type.is_type(DBTypes.MYSQL):
         data_file = get_file_from_table_name(table_name)
         character_lengths_data = load_json('character_lengths.json')[data_file]
@@ -620,7 +632,7 @@ def generate_create_table_statement(table_name: str, schema_json_file: str, db_t
 
     lines = []
     
-    # PosgreSQL has a different quotation mark for the table statement than the other database types,
+    # PostgreSQL has a different quotation mark for the table statement than the other database types,
     # so set the right quotation mark according to the current database type
     if db_type.is_type(DBTypes.SQLITE) or db_type.is_type(DBTypes.MYSQL):
         quotation_mark_table_statements = '`'
@@ -631,10 +643,10 @@ def generate_create_table_statement(table_name: str, schema_json_file: str, db_t
 
     for col_name, col_type in columns.items():
 
-        # If the database is mysql and the current column is the only primary key then mysql requires
+        # If the database is mysql and the current column is the only primary key, then mysql requires
         # that we set a maximum length of the primary keys (always type varchar).
-        # Since the primary key value is always relatively short we can pick 255 as max length
-        # For the values of non-primary keys this is not necessary
+        # Since the primary key value is always relatively short, we can pick 255 as the max length
+        # For the values of non-primary keys; this is not necessary
         if db_type.is_type(DBTypes.MYSQL) and col_name in primary_keys and len(primary_keys) == 1 and col_type.lower() == 'text':
             col_type = 'VARCHAR(255)'
 
@@ -645,7 +657,7 @@ def generate_create_table_statement(table_name: str, schema_json_file: str, db_t
             line += " PRIMARY KEY"
         lines.append(line)
 
-    # Add composite PRIMARY KEY constraint if needed
+    # Add a composite PRIMARY KEY constraint if needed
     if isinstance(primary_keys, list) and len(primary_keys) > 1:
         primary_keys_alt = [f'{quotation_mark_table_statements}{pk}{quotation_mark_table_statements}' for pk in primary_keys]
         pks_text = ", ".join(primary_keys_alt)
@@ -657,22 +669,23 @@ def generate_create_table_statement(table_name: str, schema_json_file: str, db_t
 
     return create_stmt
 
-def create_tables_from_sql(engine: Engine, schema_json_file:str ='schemas/db_schema.json'):
+def create_tables_from_sql(engine: Engine, db_type: DBType, schema_json_file:str ='schemas/db_schema.json'):
     """
-    Creates tables in the database from the provided json schema file,
+    Creates tables in the database from the provided JSON schema file,
     only if they don't already exist.
 
     :param engine: SQLAlchemy engine or sqlite3 connection.
-    :param schema_json_file: path to the schema json file
+    :param schema_json_file: Path to the schema JSON file
+    :param db_type: type of db (sqlite, PostgreSQL, or mysql)
     """
     # Get db type (based on the db connection) and load the db schema
-    db_type = get_database_type(engine)
     schema = load_json(schema_json_file)
     
-    # Get all the tables that can exist (either need to be made or already exist). Tables come from the schema json
+    # Get all the tables that can exist (either need to be made or already exist). Tables come from the schema JSON
     tables = list(schema.keys())
     
-    # If a table does not already exist in the database then generate a create table statement and execute it on the database
+    # If a table does not already exist in the database,
+    # then generate a create table statement and execute it on the database
     with engine.connect() as connection:
         for table_name in tables:
             if table_exists(connection, table_name, db_type):
@@ -680,7 +693,7 @@ def create_tables_from_sql(engine: Engine, schema_json_file:str ='schemas/db_sch
                 continue
             
             # It can be that there is an error with creating the table statement (THIS SHOULD NOT HAPPEN!), 
-            # if so then print that there is an error and print the statement for debugging.
+            # if so, then print that there is an error and print the statement for debugging.
             try:
                 create_table_statement = generate_create_table_statement(table_name, schema_json_file, db_type)
                 connection.execute(text(create_table_statement))
@@ -690,14 +703,17 @@ def create_tables_from_sql(engine: Engine, schema_json_file:str ='schemas/db_sch
                 print(generate_create_table_statement(table_name, schema_json_file, db_type))
 
 
-def main(conn):
-    global maximum_rows_database
+def main(engine: Engine, db_type: DBType):
 
     """
     Adds the reddit data to a database (sqlite or postgresql) without selecting specific lines, it just adds all the data.
 
-    :param conn: connection to the database
+    :param engine: Database engine
+    :param db_type: The type of the database, either sqlite, mysql, or postgresql
     """
+    # Global variables
+    global maximum_rows_database
+
     # Set up the logger
     os.makedirs("logs/summaries", exist_ok=True)
     time_now = time.time()
@@ -707,7 +723,6 @@ def main(conn):
     sys.stdout = logger
 
     # Set the path for the db info file according to the db type
-    db_type = get_database_type(conn)
     match db_type:
         case DBTypes.SQLITE:
             db_info_file = 'databases/db_info_sqlite_ALL.json'
@@ -720,7 +735,7 @@ def main(conn):
 
     print(f'[{db_type.to_string_capitalized()}] Only adding new data. To rebuild existing tables, remove them from the {db_info_file} file')
 
-    # If there is no db info file yet, then write an empty json such that the file can be accessed
+    # If there is no db info file yet, then write an empty JSON such that the file can be accessed
     if not os.path.isfile(db_info_file):
         write_json([], db_info_file)
 
@@ -729,7 +744,7 @@ def main(conn):
     tables_exist_skip = set()
     
     # Check if tables in the database are also in the db info file, if not ask user to delete it
-    for table in get_tables_database(conn):
+    for table in get_tables_database(engine, db_type):
         delete_table = True
         data = load_json(db_info_file)
         for obj in data:
@@ -737,7 +752,7 @@ def main(conn):
                 delete_table = False
                 break
         if delete_table:
-            result_delete = delete_table_db(table, conn)
+            result_delete = delete_table_db(table, engine, db_type)
             if result_delete:
                 tables_exist_skip.add(table)
                 print(f'[{db_type.to_string_capitalized()}] Skipping table {table}')
@@ -751,7 +766,7 @@ def main(conn):
     maximum_rows_database = data['maximum_rows_database']
     chunk_size = data[db_type.to_string()]['chunk_size']
 
-    create_tables_from_sql(conn)
+    create_tables_from_sql(engine, db_type)
    
     # Preparing data
     for file in data_files:
@@ -772,16 +787,17 @@ def main(conn):
         tables_to_process = is_file_tables_added_db(file, tables, db_info_file)
         tables_to_process = list(set(tables_to_process) - tables_exist_skip)
         if tables_to_process:
-            process_table(file, tables_to_process, conn, table_columns, ignored_author_names, chunk_size)
+            process_table(data_file=file, tables=tables_to_process, engine=engine, table_columns=table_columns,
+                          ignored_author_names=ignored_author_names, chunk_size=chunk_size, db_type=db_type)
             add_file_table_db_info(file, tables_to_process, db_info_file)
             
             # Set index for better read performance
             for table in tables_to_process:
-                set_index(conn, table)
+                set_index(engine=engine, table_name=table, db_type=db_type)
 
     # Rename log file for clarity
     logger.close()
     sys.stdout = sys.__stdout__
-    if os.path.isfile(log_filename):  # Only rename when the file exists.
-                                      # If nothing is done then file does not exist for example
+    if os.path.isfile(log_filename):  # Only rename it when the file exists.
+                                      # If nothing is done, then the file does not exist, for example
         os.rename(log_filename, f'logs/FINISHED_{log_basename}')

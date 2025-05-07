@@ -1,0 +1,17 @@
+{
+  "simple_select_authors": {
+    "times": [
+      22
+    ]
+  },
+  "simple_count": {
+    "times": [
+      3
+    ]
+  },
+  "simple_unique": {
+    "times": [
+      22
+    ]
+  }
+}

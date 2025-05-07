@@ -2,25 +2,25 @@
   "simple": {
     "query_type": "simple",
     "queries": [
-      "SELECT DISTINCT author_fullname FROM author",
-      "",
-      ""
+      {"name":  "simple_select_authors", "query":  "SELECT author_fullname FROM author"},
+      {"name":  "simple_count", "query":  "SELECT COUNT(DISTINCT author_fullname) FROM author"},
+      {"name":  "simple_unique", "query":  "SELECT DISTINCT author_fullname FROM author"}
     ]
   },
   "joins": {
-    "query_type": "joins",
+    "query_type": "join",
     "queries": [
-      "SELECT DISTINCT author_fullname FROM author",
-      "",
-      ""
+      {"name":  "join_select_authors", "query":  "SELECT author_fullname FROM author"},
+      {"name":  "join_count", "query":  "SELECT COUNT(DISTINCT author_fullname) FROM author"},
+      {"name":  "join_unique", "query":  "SELECT DISTINCT author_fullname FROM author"}
     ]
   },
   "advanced": {
     "query_type": "advanced",
     "queries": [
-      "SELECT DISTINCT author_fullname FROM author",
-      "",
-      ""
+      {"name":  "advanced_select_authors", "query":  "SELECT author_fullname FROM author"},
+      {"name":  "advanced_count", "query":  "SELECT COUNT(DISTINCT author_fullname) FROM author"},
+      {"name":  "advanced_unique", "query":  "SELECT DISTINCT author_fullname FROM author"}
     ]
   }
 }

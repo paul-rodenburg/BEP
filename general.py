@@ -79,21 +79,20 @@ def get_database_type(conn) -> DBType:
     :raises ValueError: if the connection type is not supported
     :return: DBType instance
     """
-    db_type = DBType()
 
     if isinstance(conn, sqlite3.Connection):  # SQLite
-        db_type.set_type(DBTypes.SQLITE)
+        db_type = DBType(DBTypes.SQLITE)
         return db_type
 
     elif isinstance(conn, Engine):  # PostgreSQL or MySQL
         dialect_name = conn.dialect.name
         match dialect_name:
             case "postgresql":
-                db_type.set_type(DBTypes.POSTGRESQL)
+                db_type = DBType(DBTypes.POSTGRESQL)
             case "mysql":
-                db_type.set_type(DBTypes.MYSQL)
+                db_type = DBType(DBTypes.MYSQL)
             case "sqlite":
-                db_type.set_type(DBTypes.SQLITE)
+                db_type = DBType(DBTypes.SQLITE)
             case _:
                 raise ValueError(f"Unsupported SQL dialect: {dialect_name}")
         return db_type
@@ -102,7 +101,7 @@ def get_database_type(conn) -> DBType:
         raise ValueError(f"Unsupported connection type: {type(conn)}")
 
 
-def get_tables_database(engine):
+def get_tables_database(engine: Engine, db_type: DBType):
     """
     Gets the tables of a database.
 
@@ -110,7 +109,6 @@ def get_tables_database(engine):
 
     :raises ValueError: if the connection type is not supported
     """
-    db_type = get_database_type(engine)
     match db_type:
         case DBTypes.SQLITE:
             with engine.connect() as conn:

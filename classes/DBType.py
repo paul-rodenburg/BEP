@@ -19,9 +19,6 @@ class DBType:
     def __init__(self, db_type: DBTypes = None):
         self.db_type = db_type
 
-    def set_type(self, db_type: DBTypes):
-        self.db_type = db_type
-
     def is_type(self, db_type: DBTypes) -> bool:
         return self.db_type == db_type
 

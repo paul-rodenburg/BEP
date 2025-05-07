@@ -1,4 +1,4 @@
-import json
+import orjson as json
 import pymongo
 from tqdm import tqdm
 from general import check_files, make_mongodb_engine, update_summary_log
@@ -10,6 +10,7 @@ from classes.logger import Logger
 import time
 from datetime import datetime
 from classes.DBType import DBType, DBTypes
+from itertools import islice
 
 # Update working directory
 current_directory = os.getcwd()
@@ -21,6 +22,8 @@ os.makedirs('databases', exist_ok=True)
 
 # Check if necessary data files exist
 check_files()
+pbar = None
+
 # Set up the logger
 os.makedirs("logs/summaries", exist_ok=True)
 time_now = time.time()
@@ -29,17 +32,16 @@ summary_filename = f"logs/summaries/summary_mongodb.json"
 sys.stdout = Logger(log_filename)
 
 # Load config
-with open('config.json', 'r', encoding='utf-8') as f:
-    data = json.load(f)
-    data_files_tables = data['data_files_tables']
-    maximum_rows_database = data['maximum_rows_database']
-    chunk_size = data['mongodb']['chunk_size']
-
+data = load_json('config.json')
+data_files_tables = data['data_files_tables']
+maximum_rows_database = data['maximum_rows_database']
+chunk_size = data['mongodb']['chunk_size']
 
 db = make_mongodb_engine()
 db_info_file = 'databases/db_info_mongodb.json'
-db_type = DBType()
-db_type.set_type(DBTypes.MONGODB)
+db_type = DBType(DBTypes.MONGODB)
+
+print(f'[{db_type.to_string_capitalized()}] Max rows: {maximum_rows_database:,}')
 
 for data_file, tables_file in data_files_tables.items():
     collection_name = tables_file['mongodb']
@@ -62,8 +64,7 @@ for data_file, tables_file in data_files_tables.items():
     # Time measurements
     start_time = datetime.now()
     # Add index
-    pm = get_primary_key(collection_name)[0]
-    collection.create_index([(pm, pymongo.ASCENDING)])
+    pm = get_primary_key(collection_name)
 
     # Open NDJSON file and insert in chunks
     with open(data_file, "r", encoding="utf-8") as file:
@@ -71,7 +72,7 @@ for data_file, tables_file in data_files_tables.items():
         total_lines = min(get_line_count_file(data_file), maximum_rows_database)
         line_count = 0
         pbar = tqdm(total=total_lines, desc=f"[{db_type.to_string_capitalized()}] Importing {collection_name} data to MongoDB collection {collection_name}", unit="docs")
-        for line in file:
+        for line in islice(file, maximum_rows_database):
             line_count += 1
             pbar.update(1)
             if line.strip():  # Ignore empty lines
@@ -79,20 +80,28 @@ for data_file, tables_file in data_files_tables.items():
 
             if len(buffer) >= chunk_size:  # Insert when buffer reaches chunk size
                 collection.insert_many(buffer)
-                pbar.update(len(buffer))
                 buffer.clear()  # Clear buffer after inserting
 
-            if line_count >= maximum_rows_database:  # Stop if there are maximum_rows_database written to avoid a very very large db
-                if buffer:
-                    collection.insert_many(buffer)
-                    pbar.update(len(buffer))
-                    buffer.clear()  # Clear memory
-                break
+            # if line_count >= maximum_rows_database:  # Stop if there are maximum_rows_database written to avoid a very very large db
+            #     if buffer:
+            #         collection.insert_many(buffer)
+            #         pbar.update(len(buffer))
+            #         buffer.clear()  # Clear memory
+            #     break
 
         # Insert any remaining documents
         if buffer:
             collection.insert_many(buffer)
             pbar.update(len(buffer))
+
+        # Creating index
+        if isinstance(pm, list):
+            for primary_key in pm:
+                print(f"[{db_type.to_string_capitalized()}] Creating index for '{collection_name}' and pm: {primary_key}...")
+                collection.create_index([(primary_key, pymongo.ASCENDING)])
+        else:
+            print(f"[{db_type.to_string_capitalized()}] Creating index for '{collection_name}' and pm: {pm}...")
+            collection.create_index([(pm, pymongo.ASCENDING)])
 
         # Time measurements
         end_time = datetime.now()
@@ -107,6 +116,7 @@ for data_file, tables_file in data_files_tables.items():
     add_file_table_db_info(data_file, collection_name, db_info_file)
 
 # Save the tqdm bar (for timing)
-print(str(pbar))
+if pbar:
+    print(str(pbar))
 
 print(f"[{db_type.to_string_capitalized()}] Data import completed successfully!")
