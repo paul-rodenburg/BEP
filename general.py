@@ -124,7 +124,7 @@ def get_tables_database(engine: Engine, db_type: DBType):
                 result = conn.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public';"))
             return [row[0] for row in result.fetchall()]
         case DBTypes.MONGODB:
-            db = make_mongodb_engine()
+            db = make_mongodb_client()
             collections = list(db.list_collection_names())
             db.client.close()
             return collections
@@ -235,7 +235,7 @@ def make_mysql_engine(db_name=None):
     return engine
 
 
-def make_mongodb_engine() -> Database[Mapping[str, Any] | Any]:
+def make_mongodb_client() -> Database[Mapping[str, Any] | Any]:
     """
     Makes a mongodb connection
     :return: a mongodb connection

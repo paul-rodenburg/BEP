@@ -1,7 +1,7 @@
 import orjson as json
 import pymongo
 from tqdm import tqdm
-from general import check_files, make_mongodb_engine, update_summary_log
+from general import check_files, make_mongodb_client, update_summary_log
 from line_counts import get_line_count_file
 import os
 from data_to_sql import add_file_table_db_info, is_file_tables_added_db, get_primary_key, load_json, write_json
@@ -37,7 +37,7 @@ data_files_tables = data['data_files_tables']
 maximum_rows_database = data['maximum_rows_database']
 chunk_size = data['mongodb']['chunk_size']
 
-db = make_mongodb_engine()
+db = make_mongodb_client()
 db_info_file = 'databases/db_info_mongodb.json'
 db_type = DBType(DBTypes.MONGODB)
 

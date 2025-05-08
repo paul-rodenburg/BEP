@@ -15,6 +15,9 @@ class DBTypes(Enum):
             "mongodb": "MongoDB"
         }.get(self.value, f"Unknown {self.value}")
 
+    def is_sql(self) -> bool:
+        return self.value in ["mysql", "sqlite", "postgresql"]
+
 class DBType:
     def __init__(self, db_type: DBTypes = None):
         self.db_type = db_type

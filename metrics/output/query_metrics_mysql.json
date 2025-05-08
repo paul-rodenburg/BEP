@@ -1,0 +1,24 @@
+{
+  "simple_select_authors": {
+    "times": [
+      114.9905161857605
+    ],
+    "memories": [
+      2575711.3056640625
+    ],
+    "output_lengths": [
+      8754351
+    ]
+  },
+  "simple_count_posts": {
+    "times": [
+      5.781571388244629
+    ],
+    "memories": [
+      52.580078125
+    ],
+    "output_lengths": [
+      1
+    ]
+  }
+}
