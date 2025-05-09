@@ -1,0 +1,44 @@
+{
+  "select_path_content_from_wiki": {
+    "times": [
+      8.6911,
+      9.1407
+    ],
+    "memories": [
+      3070817.9785,
+      3070818.0332
+    ],
+    "output_lengths": [
+      322964,
+      322964
+    ]
+  },
+  "simple_count": {
+    "times": [
+      0.3178,
+      0.259
+    ],
+    "memories": [
+      25.543,
+      22.6289
+    ],
+    "output_lengths": [
+      1,
+      1
+    ]
+  },
+  "simple_unique": {
+    "times": [
+      1.312,
+      1.3831
+    ],
+    "memories": [
+      2456.4121,
+      2459.6309
+    ],
+    "output_lengths": [
+      34366,
+      34366
+    ]
+  }
+}

@@ -148,10 +148,10 @@ def read_file_reverse(file_path):
                     yield line  # Yield lines in reverse order
 
 
-def check_files(db_type: None | str = None):
+def check_files(db_type: None | DBType = None):
     # Check if character count file exists
     # This is necessary to change TEXT to LONGTEXT for some attributes in MySQL, because of long lengths of data
-    if db_type and db_type.lower().strip() == 'mysql' and not os.path.isfile('character_lengths.json'):
+    if db_type and db_type.is_type(DBTypes.MYSQL) and not os.path.isfile('character_lengths.json'):
         print("character_lengths.json not found. Running the script now...")
         subprocess.run(["python", "count_characters_db.py"])
         # raise FileNotFoundError(
@@ -210,7 +210,7 @@ def make_postgres_engine():
     return engine
 
 
-def make_mysql_engine(db_name=None):
+def make_mysql_engine(db_type: DBType|None):
     """
     Makes a sqlite connection
     :return: a sqlite connection
@@ -228,22 +228,30 @@ def make_mysql_engine(db_name=None):
     else:
         engine_url = f"mysql+pymysql://{user}@{host}"
 
-    if db_name is not None:
-        engine_url = f"{engine_url}/{db_name}"
+    if db_type is not None:
+        engine_url = f"{engine_url}/{db_type}"
 
     engine = create_engine(engine_url)
     return engine
 
 
-def make_mongodb_client() -> Database[Mapping[str, Any] | Any]:
+def make_mongodb_client(db_type: DBType) -> Database[Mapping[str, Any] | Any]:
     """
     Makes a mongodb connection
-    :return: a mongodb connection
+
+    :param db_type: Database type to connect to.
+    :return: A mongodb connection
     """
     data = load_json('config.json')['mongodb']
     host = data["host"]
     port = data["port"]
-    db_name = data["db_name"]
+
+    # If the name is 'ALL', then get the db with the name in the config file
+    if db_type.name.lower() == 'all':
+        db_name = data["db_name"]
+    else:
+        db_name = f"{data["db_name"]}_{db_type.name}"
+    
     custom_engine_url = data["custom_engine_url"]
     # Connect to MongoDB
     if custom_engine_url is not None:

@@ -364,6 +364,10 @@ def add_file_table_db_info(data_file, tables, db_info_file):
     if not os.path.isfile(db_info_file):
         write_json([], db_info_file)
 
+    # Ensure that the tables variable is a list for consistency
+    if not isinstance(tables, list):
+        tables = [tables]
+
     data = load_json(db_info_file)
 
     file_entry = next((obj for obj in data if obj['file'] == data_file), None)
@@ -424,18 +428,23 @@ def clean_json_duplicates(json_file):
 
 delete_all = False
 
-def delete_table_db(table_name: str, engine: Engine, db_type: DBType):
+def delete_table_db(table_name: str, engine: Engine, db_type: DBType, schema_tables: list[str]):
     """
     If a table exists, asks the user to delete it. If the table does not exist, noting is done.
 
     :param table_name: Name of the table to delete
     :param engine: Connection to the database :param db_type:  type, either sqlite, mysql, or postgresql
     :param db_type: Database type, either sqlite, mysql, or PostgreSQL
+    :param schema_tables: List of tables in the schema
 
     :raises ValueError: If the connection type is not supported
     """
     # Global variables
     global delete_all
+
+    # Detect if table name is not a system one
+    if table_name not in schema_tables:  # It is a system table we don't want to delete that
+        return None
 
     with engine.connect() as conn:
         if table_exists(conn, table_name, db_type):
@@ -742,6 +751,7 @@ def main(engine: Engine, db_type: DBType):
     clean_json_duplicates(db_info_file)
 
     tables_exist_skip = set()
+    schema_tables = list(load_json('schemas/db_schema.json').keys())
     
     # Check if tables in the database are also in the db info file, if not ask user to delete it
     for table in get_tables_database(engine, db_type):
@@ -752,7 +762,7 @@ def main(engine: Engine, db_type: DBType):
                 delete_table = False
                 break
         if delete_table:
-            result_delete = delete_table_db(table, engine, db_type)
+            result_delete = delete_table_db(table, engine, db_type, schema_tables)
             if result_delete:
                 tables_exist_skip.add(table)
                 print(f'[{db_type.display_name}] Skipping table {table}')

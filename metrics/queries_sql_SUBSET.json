@@ -46,7 +46,7 @@
       },
       {
         "name": "advanced_active_subreddits_by_post_count",
-        "query": "SELECT subreddit, COUNT(*) AS post_count FROM post GROUP BY subreddit ORDER BY post_count DESC LIMIT 10"
+        "query": "SELECT subreddit_id, COUNT(*) AS post_count FROM post GROUP BY subreddit_id ORDER BY post_count DESC LIMIT 10"
       }
     ]
   },
