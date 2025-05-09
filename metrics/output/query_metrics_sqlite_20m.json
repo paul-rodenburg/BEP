@@ -1,0 +1,46 @@
+{
+  "simple_select_authors": {
+    "times": [
+      19
+    ],
+    "memories": [
+      1508466.6982421875
+    ],
+    "output_lengths": [
+      5262254
+    ]
+  },
+  "simple_count_posts": {
+    "times": [
+      4
+    ],
+    "memories": [
+      34.0283203125
+    ],
+    "output_lengths": [
+      1
+    ]
+  },
+  "simple_unique_subreddits": {
+    "times": [
+      50
+    ],
+    "memories": [
+      105400.1416015625
+    ],
+    "output_lengths": [
+      489674
+    ]
+  },
+  "join_posts_with_authors": {
+    "times": [
+      282
+    ],
+    "memories": [
+      7977750.357421875
+    ],
+    "output_lengths": [
+      19770699
+    ]
+  }
+}

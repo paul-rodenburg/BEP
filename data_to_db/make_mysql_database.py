@@ -1,5 +1,6 @@
 from sqlalchemy import text
 import os
+from classes.DBType import DBType, DBTypes
 from data_to_sql import main
 from general import check_files, make_mysql_engine, load_json
 
@@ -18,6 +19,7 @@ engine = make_mysql_engine()
 check_files(db_type='mysql')
 
 DB_NAME = load_json('config.json')['mysql']['db_name']
+db_type_mysql = DBType(db_type=DBTypes.MYSQL, name=DB_NAME)
 
 # Create a new database
 with engine.connect() as conn:
@@ -26,5 +28,4 @@ with engine.connect() as conn:
 
 # Make engine again if the database needed to be created
 engine = make_mysql_engine(DB_NAME)
-main(engine)
-
+main(engine, db_type_mysql)

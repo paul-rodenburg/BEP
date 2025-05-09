@@ -43,3 +43,7 @@ class DBType:
 
     def is_sql(self) -> bool:
         return self.db_type.is_sql()
+
+    @property
+    def display_name(self) -> str:
+        return f'{self.db_type.display_name}_{self.name}'

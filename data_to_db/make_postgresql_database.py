@@ -1,6 +1,7 @@
 import os
 from data_to_sql import main
 from general import check_files, make_postgres_engine
+from classes.DBType import DBType, DBTypes
 
 # Update working directory
 current_directory = os.getcwd()
@@ -14,7 +15,8 @@ os.makedirs('databases', exist_ok=True)
 check_files()
 
 # Make engine
+db_type_postgresql = DBType(db_type=DBTypes.POSTGRESQL, name='ALL')
 engine = make_postgres_engine()
 
-main(engine)
+main(engine, db_type_postgresql)
 

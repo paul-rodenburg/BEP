@@ -134,35 +134,50 @@
       }
     ]
   },
-  "nested": {
+"nested": {
     "query_type": "nested",
     "queries": [
       {
-        "name": "nested_top_authors",
-        "query": "db.comment.aggregate([{ $group: { _id: '$author_fullname', comment_count: { $sum: 1 } } }, { $sort: { comment_count: -1 } }, { $limit: 5 }])"
+        "name": "nested_authors_with_more_than_100_comments",
+        "query": "db.comment.aggregate([{ $group: { _id: '$author_fullname', comment_count: { $sum: 1 } } }, { $match: { comment_count: { $gt: 100 } } }, { $project: { _id: 0, author_fullname: '$_id' } }])"
       },
       {
-        "name": "nested_subreddit_post_counts",
-        "query": "db.post.aggregate([{ $group: { _id: '$subreddit_id', post_count: { $sum: 1 } } }, { $sort: { post_count: -1 } }])"
+        "name": "simple_unique_subreddits",
+        "query": "db.post.aggregate([{ $lookup: { from: 'subreddit', localField: 'subreddit_id', foreignField: 'name', as: 'subreddit_info' } }, { $unwind: '$subreddit_info' }, { $group: { _id: '$subreddit_info.display_name' } }])"
       },
       {
-        "name": "nested_average_post_score",
-        "query": "db.post.aggregate([{ $group: { _id: null, avg_score: { $avg: '$score' } } }])"
+        "name": "simple_unique_authors",
+        "query": "db.post.aggregate([{ $group: { _id: '$author_fullname' } }])"
       },
       {
-        "name": "nested_comments_per_post",
-        "query": "db.comment.aggregate([{ $group: { _id: '$link_id', comment_count: { $sum: 1 } } }, { $sort: { comment_count: -1 } }])"
+        "name": "nested_authors_with_1000_comments_per_subreddit",
+        "query": "db.comment.aggregate([{ $group: { _id: { author_fullname: '$author_fullname', subreddit_id: '$subreddit_id' }, comment_count: { $sum: 1 } } }, { $match: { comment_count: { $gt: 1000 } } }, { $lookup: { from: 'subreddit', localField: '_id.subreddit_id', foreignField: 'name', as: 'subreddit_info' } }, { $unwind: '$subreddit_info' }, { $project: { _id: 0, author_fullname: '$_id.author_fullname', subreddit_name: '$subreddit_info.display_name' } }])"
       },
       {
-        "name": "nested_top_subreddits_by_comments",
-        "query": "db.comment.aggregate([{ $group: { _id: '$subreddit_id', comment_count: { $sum: 1 } } }, { $sort: { comment_count: -1 } }, { $limit: 5 }])"
+        "name": "nested_authors_with_unique_comments",
+        "query": "db.comment.aggregate([{ $group: { _id: '$author_fullname', unique_comment_count: { $sum: { $cond: [{ $eq: ['$unique_comment', true] }, 1, 0] } } } }, { $match: { unique_comment_count: { $gt: 100 } } }])"
       },
       {
-        "name": "nested_distinct_authors_in_subreddit",
-        "query": "db.comment.aggregate([{ $match: { subreddit_id: 't5_example' } }, { $group: { _id: '$author_fullname' } }])"
+        "name": "simple_posts_with_over_100_comments",
+        "query": "db.comment.aggregate([{ $group: { _id: '$post_id', comment_count: { $sum: 1 } } }, { $match: { comment_count: { $gt: 100 } } }])"
       },
       {
-        "name": "nested_most_awarded_posts",
-        "query":
-::contentReference[oaicite:0]{index=0}
+        "name": "simple_subreddit_info",
+        "query": "db.post.aggregate([{ $lookup: { from: 'subreddit', localField: 'subreddit_id', foreignField: 'name', as: 'subreddit_info' } }, { $unwind: '$subreddit_info' }, { $project: { _id: 0, subreddit_name: '$subreddit_info.display_name', subreddit_description: '$subreddit_info.description' } }])"
+      },
+      {
+        "name": "nested_subreddits_with_more_than_50_posts",
+        "query": "db.post.aggregate([{ $group: { _id: '$subreddit_id', post_count: { $sum: 1 } } }, { $match: { post_count: { $gt: 50 } } }, { $lookup: { from: 'subreddit', localField: '_id', foreignField: 'name', as: 'subreddit_info' } }, { $unwind: '$subreddit_info' }, { $project: { _id: 0, subreddit_name: '$subreddit_info.display_name', post_count: 1 } }])"
+      },
+      {
+        "name": "nested_top_authors_in_subreddit",
+        "query": "db.comment.aggregate([{ $group: { _id: { author_fullname: '$author_fullname', subreddit_id: '$subreddit_id' }, post_count: { $sum: 1 } } }, { $match: { post_count: { $gt: 10 } } }, { $lookup: { from: 'subreddit', localField: '_id.subreddit_id', foreignField: 'name', as: 'subreddit_info' } }, { $unwind: '$subreddit_info' }, { $project: { _id: 0, author_fullname: '$_id.author_fullname', subreddit_name: '$subreddit_info.display_name', post_count: 1 } }])"
+      },
+      {
+        "name": "nested_subreddit_rule_violations",
+        "query": "db.comment.aggregate([{ $lookup: { from: 'subreddit_rules', localField: 'subreddit_id', foreignField: 'subreddit_id', as: 'rules' } }, { $unwind: '$rules' }, { $match: { 'rules.violation_count': { $gt: 5 } } }, { $project: { _id: 0, subreddit_id: 1, violation_count: '$rules.violation_count' } }])"
+      }
+    ]
+  }
+}
 

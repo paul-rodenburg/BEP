@@ -243,7 +243,7 @@ def process_table(data_file: str, tables: list, engine: Engine,
                 added_count += 1
     sql_count = 0  # Reset count for the progress bar
     if added_count == 0:
-        print(f'[{db_type.to_string_capitalized()}] Error! All chunks of {tables} were empty')
+        print(f'[{db_type.display_name}] Error! All chunks of {tables} were empty')
 
 
 def extract_lines(data_file: str, tables: list, table_columns: dict, ignored_author_names: set, db_type: DBType, chunk_size: int) -> Generator[
@@ -268,7 +268,7 @@ def extract_lines(data_file: str, tables: list, table_columns: dict, ignored_aut
 
     start_time = datetime.now()
     progress_bar_total = min(get_line_count_file(data_file), maximum_rows_database)
-    progress_bar = tqdm(total=progress_bar_total, desc=f"[{db_type.to_string_capitalized()}] Processing {len(tables)} table(s): {tables} (from {data_file.split('/')[-1]})")
+    progress_bar = tqdm(total=progress_bar_total, desc=f"[{db_type.display_name}] Processing {len(tables)} table(s): {tables} (from {data_file.split('/')[-1]})")
 
     lines_cleaned_count = 0
     with open(data_file, 'r', encoding='utf-8') as f_data:
@@ -323,7 +323,7 @@ def write_to_db(df: pd.DataFrame, table: str, conn: Engine, len_tables: int, db_
         df.to_sql(table, conn, if_exists="append", index=False, chunksize=5000)
     except Exception as e:
         df.to_csv('error.csv', index=False)
-        print(f"\n[{db_type.to_string_capitalized()}] Error writing to database: {e}. df written to error.csv.")
+        print(f"\n[{db_type.display_name}] Error writing to database: {e}. df written to error.csv.")
         exit(1)
     sql_count += 1
     progress_bar.set_postfix_str(f'[{sql_count:,}/{math.ceil(progress_bar.total / chunk_size * len_tables):,} SQL writes]')
@@ -443,11 +443,11 @@ def delete_table_db(table_name: str, engine: Engine, db_type: DBType):
                 delete_confirm = 'y'
             else:
                 delete_confirm = input(
-                    f'[{db_type.to_string_capitalized()}] Table {table_name} already exists. Delete anyway? (y/n) (or yy to delete all)')
+                    f'[{db_type.display_name}] Table {table_name} already exists. Delete anyway? (y/n) (or yy to delete all)')
             if delete_confirm.lower().strip() != 'y':
                 if delete_confirm.lower().strip() == 'yy':
                     delete_all = True
-                    print(f'[{db_type.to_string_capitalized()}] Deleting all...')
+                    print(f'[{db_type.display_name}] Deleting all...')
                 else:
                     return True
         else:  # Table does not exist
@@ -457,17 +457,17 @@ def delete_table_db(table_name: str, engine: Engine, db_type: DBType):
         case DBTypes.SQLITE:
             with engine.connect() as conn:
                 conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
-            print(f'[{db_type.to_string_capitalized()}] Deleted table {table_name}')
+            print(f'[{db_type.display_name}] Deleted table {table_name}')
         case DBTypes.MYSQL:
             with engine.connect() as conn:
                 conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
-            print(f'[{db_type.to_string_capitalized()}] Deleted table {table_name}')
+            print(f'[{db_type.display_name}] Deleted table {table_name}')
         case DBTypes.POSTGRESQL:
             with engine.connect() as conn:
                 conn.execute(text(f"DROP TABLE IF EXISTS {table_name} CASCADE"))
-            print(f'[{db_type.to_string_capitalized()}] Deleted table {table_name}')
+            print(f'[{db_type.display_name}] Deleted table {table_name}')
         case _:
-            raise ValueError(f'[{db_type.to_string_capitalized()}] Unknown database type: {db_type}')
+            raise ValueError(f'[{db_type.display_name}] Unknown database type: {db_type}')
 
 
 def table_exists(connection: Connection, table_name: str, db_type: DBType):
@@ -506,7 +506,7 @@ def table_exists(connection: Connection, table_name: str, db_type: DBType):
         return result is not None
 
     else:
-        raise ValueError(f'[{db_type.to_string_capitalized()}] Unknown database type: {db_type}')
+        raise ValueError(f'[{db_type.display_name}] Unknown database type: {db_type}')
 
 
 def set_index(engine: Engine, table_name: str, db_type: DBType):
@@ -522,7 +522,7 @@ def set_index(engine: Engine, table_name: str, db_type: DBType):
     """
     pms = get_primary_key(table_name)
 
-    print(f"[{db_type.to_string_capitalized()}] Setting index for table '{table_name}' and columns {pms}...")
+    print(f"[{db_type.display_name}] Setting index for table '{table_name}' and columns {pms}...")
     
     # Set the index for the primary key columns
     for pm in pms:
@@ -582,7 +582,7 @@ def set_index(engine: Engine, table_name: str, db_type: DBType):
                 conn.commit()
 
         else:
-            raise ValueError(f'[{db_type.to_string_capitalized()}] Unknown database type: {db_type}')
+            raise ValueError(f'[{db_type.display_name}] Unknown database type: {db_type}')
 
 def get_file_from_table_name(table_name: str) -> str|None:
     """
@@ -639,7 +639,7 @@ def generate_create_table_statement(table_name: str, schema_json_file: str, db_t
     elif db_type.is_type(DBTypes.POSTGRESQL):
         quotation_mark_table_statements = '"'
     else:
-        raise ValueError(f'[{db_type.to_string_capitalized()}] Unsupported database type: {db_type}')
+        raise ValueError(f'[{db_type.display_name}] Unsupported database type: {db_type}')
 
     for col_name, col_type in columns.items():
 
@@ -697,7 +697,7 @@ def create_tables_from_sql(engine: Engine, db_type: DBType, schema_json_file:str
             try:
                 create_table_statement = generate_create_table_statement(table_name, schema_json_file, db_type)
                 connection.execute(text(create_table_statement))
-                print(f"[{db_type.to_string_capitalized()}] Created table: {table_name}")
+                print(f"[{db_type.display_name}] Created table: {table_name}")
             except Exception as e:
                 print(f"Error creating table {table_name}: {e}")
                 print(generate_create_table_statement(table_name, schema_json_file, db_type))
@@ -731,9 +731,9 @@ def main(engine: Engine, db_type: DBType):
         case DBTypes.MYSQL:
             db_info_file = f'databases/db_info_mysql_{db_type.name}.json'
         case _:
-            raise ValueError(f'[{db_type.to_string_capitalized()}] Unknown database type: {db_type}')
+            raise ValueError(f'[{db_type.display_name}] Unknown database type: {db_type}')
 
-    print(f'[{db_type.to_string_capitalized()}] Only adding new data. To rebuild existing tables, remove them from the {db_info_file} file')
+    print(f'[{db_type.display_name}] Only adding new data. To rebuild existing tables, remove them from the {db_info_file} file')
 
     # If there is no db info file yet, then write an empty JSON such that the file can be accessed
     if not os.path.isfile(db_info_file):
@@ -755,7 +755,7 @@ def main(engine: Engine, db_type: DBType):
             result_delete = delete_table_db(table, engine, db_type)
             if result_delete:
                 tables_exist_skip.add(table)
-                print(f'[{db_type.to_string_capitalized()}] Skipping table {table}')
+                print(f'[{db_type.display_name}] Skipping table {table}')
 
     table_columns = dict()
 

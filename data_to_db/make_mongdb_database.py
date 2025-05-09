@@ -39,26 +39,26 @@ chunk_size = data['mongodb']['chunk_size']
 
 db = make_mongodb_client()
 db_info_file = 'databases/db_info_mongodb.json'
-db_type = DBType(DBTypes.MONGODB)
+db_type = DBType(DBTypes.MONGODB, name='ALL')
 
-print(f'[{db_type.to_string_capitalized()}] Max rows: {maximum_rows_database:,}')
+print(f'[{db_type.display_name}] Max rows: {maximum_rows_database:,}')
 
 for data_file, tables_file in data_files_tables.items():
     collection_name = tables_file['mongodb']
     if not is_file_tables_added_db(data_file, collection_name, db_info_file):
-        print(f'[{db_type.to_string_capitalized()}] Skipping {collection_name}...')
+        print(f'[{db_type.display_name}] Skipping {collection_name}...')
         continue
     collection = db[collection_name]  # Collection Name
     # Check if collection exists
     if collection_name in db.list_collection_names():
 
-        response = input(f"[{db_type.to_string_capitalized()}] Collection '{collection_name}' already exists. Remove it? (y/n): ")
+        response = input(f"[{db_type.display_name}] Collection '{collection_name}' already exists. Remove it? (y/n): ")
 
         if response == "y":
             collection.drop()  # Remove collection
-            print(f"[{db_type.to_string_capitalized()}] Collection '{collection_name}' deleted.")
+            print(f"[{db_type.display_name}] Collection '{collection_name}' deleted.")
         elif response == "n":
-            print(f"[{db_type.to_string_capitalized()}] Skipping collection '{collection_name}'.")
+            print(f"[{db_type.display_name}] Skipping collection '{collection_name}'.")
             continue  # Skip to next iteration if user says no
 
     # Time measurements
@@ -71,7 +71,7 @@ for data_file, tables_file in data_files_tables.items():
         buffer = []
         total_lines = min(get_line_count_file(data_file), maximum_rows_database)
         line_count = 0
-        pbar = tqdm(total=total_lines, desc=f"[{db_type.to_string_capitalized()}] Importing {collection_name} data to MongoDB collection {collection_name}", unit="docs")
+        pbar = tqdm(total=total_lines, desc=f"[{db_type.display_name}] Importing {collection_name} data to MongoDB collection {collection_name}", unit="docs")
         for line in islice(file, maximum_rows_database):
             line_count += 1
             pbar.update(1)
@@ -97,10 +97,10 @@ for data_file, tables_file in data_files_tables.items():
         # Creating index
         if isinstance(pm, list):
             for primary_key in pm:
-                print(f"[{db_type.to_string_capitalized()}] Creating index for '{collection_name}' and pm: {primary_key}...")
+                print(f"[{db_type.display_name}] Creating index for '{collection_name}' and pm: {primary_key}...")
                 collection.create_index([(primary_key, pymongo.ASCENDING)])
         else:
-            print(f"[{db_type.to_string_capitalized()}] Creating index for '{collection_name}' and pm: {pm}...")
+            print(f"[{db_type.display_name}] Creating index for '{collection_name}' and pm: {pm}...")
             collection.create_index([(pm, pymongo.ASCENDING)])
 
         # Time measurements
@@ -119,4 +119,4 @@ for data_file, tables_file in data_files_tables.items():
 if pbar:
     print(str(pbar))
 
-print(f"[{db_type.to_string_capitalized()}] Data import completed successfully!")
+print(f"[{db_type.display_name}] Data import completed successfully!")

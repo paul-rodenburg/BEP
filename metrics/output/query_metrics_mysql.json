@@ -1,10 +1,10 @@
 {
   "simple_select_authors": {
     "times": [
-      114.9905161857605
+      103.64032745361328
     ],
     "memories": [
-      2575711.3056640625
+      2575711.4521484375
     ],
     "output_lengths": [
       8754351
@@ -12,13 +12,68 @@
   },
   "simple_count_posts": {
     "times": [
-      5.781571388244629
+      5.256919860839844
     ],
     "memories": [
-      52.580078125
+      54.041015625
     ],
     "output_lengths": [
       1
+    ]
+  },
+  "simple_unique_subreddits": {
+    "times": [
+      77.17421078681946
+    ],
+    "memories": [
+      164912.6572265625
+    ],
+    "output_lengths": [
+      740864
+    ]
+  },
+  "simple_count_comments": {
+    "times": [
+      12.228877067565918
+    ],
+    "memories": [
+      53.4775390625
+    ],
+    "output_lengths": [
+      1
+    ]
+  },
+  "join_posts_with_authors": {
+    "times": [
+      3281.6752898693085
+    ],
+    "memories": [
+      16236597.900390625
+    ],
+    "output_lengths": [
+      39471785
+    ]
+  },
+  "join_posts_with_subreddits": {
+    "times": [
+      909.5078659057617
+    ],
+    "memories": [
+      16341299.379882812
+    ],
+    "output_lengths": [
+      39905964
+    ]
+  },
+  "join_comments_with_posts": {
+    "times": [
+      291.35191082954407
+    ],
+    "memories": [
+      87.6123046875
+    ],
+    "output_lengths": [
+      0
     ]
   }
 }

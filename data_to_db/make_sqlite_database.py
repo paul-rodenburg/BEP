@@ -16,6 +16,10 @@ os.makedirs(db_folder, exist_ok=True)
 # Check if necessary data files exist
 check_files()
 
-db_type = DBType(db_type=DBTypes.SQLITE, name='20m', max_rows=20_000_000)
-engine = make_sqlite_engine(db_type)
-main(engine, db_type)
+# Make engine
+db_type_sqlite = DBType(db_type=DBTypes.SQLITE, name='20m', max_rows=20_000_000)
+engine = make_sqlite_engine(db_type_sqlite)
+
+# Make the database
+main(engine, db_type_sqlite)
+
