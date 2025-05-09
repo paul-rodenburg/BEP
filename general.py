@@ -9,6 +9,9 @@ import subprocess
 import os
 from classes.DBType import DBTypes, DBType
 from datetime import datetime
+import psycopg2
+from sqlalchemy import create_engine
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 def load_json(file_path) -> dict | list:
     """
@@ -69,36 +72,6 @@ def extract_line(line_nr, content_file_path) -> str | None:
             if count_line_find == line_nr:
                 return line
     return None
-
-
-def get_database_type(conn) -> DBType:
-    """
-    Gets the database type based on the connection.
-
-    :param conn: connection to the database
-    :raises ValueError: if the connection type is not supported
-    :return: DBType instance
-    """
-
-    if isinstance(conn, sqlite3.Connection):  # SQLite
-        db_type = DBType(DBTypes.SQLITE)
-        return db_type
-
-    elif isinstance(conn, Engine):  # PostgreSQL or MySQL
-        dialect_name = conn.dialect.name
-        match dialect_name:
-            case "postgresql":
-                db_type = DBType(DBTypes.POSTGRESQL)
-            case "mysql":
-                db_type = DBType(DBTypes.MYSQL)
-            case "sqlite":
-                db_type = DBType(DBTypes.SQLITE)
-            case _:
-                raise ValueError(f"Unsupported SQL dialect: {dialect_name}")
-        return db_type
-
-    else:
-        raise ValueError(f"Unsupported connection type: {type(conn)}")
 
 
 def get_tables_database(engine: Engine, db_type: DBType):
@@ -186,31 +159,61 @@ def make_sqlite_engine(db_type: DBType):
     """
     data = load_json('config.json')['sqlite']
     db_folder = data['db_folder']
-    engine = create_engine(f'sqlite:///{db_folder}/reddit_data_{db_type.name}.db')
+    engine = create_engine(f'sqlite:///{db_folder}/reddit_data_{db_type.name_suffix}.db')
     return engine
 
 
-def make_postgres_engine():
+def make_postgres_engine(db_type: DBType = None):
     """
-    Makes a sqlite connection
-    :return: a sqlite connection
-    """
+    Ensures the PostgreSQL database exists and returns a SQLAlchemy engine.
 
+    :param db_type: Database type to connect to.
+
+    :return: SQLAlchemy engine for the PostgreSQL database.
+    """
     data = load_json('config.json')['postgresql']
     host = data["host"]
     user = data["username"]
     password = data["password"]
     port = data["port"]
-    db_name = data["db_name"]
-    custom_engine_url = data["custom_engine_url"]
+    if db_type:
+        db_name = f"reddit_data_{db_type.name_suffix}"
+    else:
+        db_name = data["db_name"]
+    custom_engine_url = data.get("custom_engine_url")
+
+    # If a custom engine URL is provided, use it directly
     if custom_engine_url is not None:
         engine = create_engine(custom_engine_url)
-    else:
-        engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}/{db_name}")
+        return engine
+
+    # Connect to the default 'postgres' database to check/create the target DB
+    conn = psycopg2.connect(
+        dbname="postgres",
+        user=user,
+        password=password,
+        host=host,
+        port=port
+    )
+    conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+    cur = conn.cursor()
+
+    # Check if DB exists, if not, create it
+    cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (db_name,))
+    exists = cur.fetchone()
+    if not exists:
+        cur.execute(f'CREATE DATABASE "{db_name}"')
+        print(f"[{db_type.display_name}] Database '{db_name}' created.")
+
+    cur.close()
+    conn.close()
+
+    # Return SQLAlchemy engine for the created or existing database
+    engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}/{db_name}")
     return engine
 
 
-def make_mysql_engine(db_type: DBType|None):
+def make_mysql_engine(db_type: DBType|None=None):
     """
     Makes a sqlite connection
     :return: a sqlite connection
@@ -220,6 +223,10 @@ def make_mysql_engine(db_type: DBType|None):
     user = data["username"]
     password = data["password"]
     custom_engine_url = data["custom_engine_url"]
+    if db_type:
+        db_name = db_type.name_suffix
+    else:
+        db_name = data["db_name"]
 
     if custom_engine_url is not None:
         engine_url = custom_engine_url
@@ -229,13 +236,13 @@ def make_mysql_engine(db_type: DBType|None):
         engine_url = f"mysql+pymysql://{user}@{host}"
 
     if db_type is not None:
-        engine_url = f"{engine_url}/{db_type}"
+        engine_url = f"{engine_url}/reddit_data_{db_name}"
 
     engine = create_engine(engine_url)
     return engine
 
 
-def make_mongodb_client(db_type: DBType) -> Database[Mapping[str, Any] | Any]:
+def make_mongodb_client(db_type: DBType=None) -> Database[Mapping[str, Any] | Any]:
     """
     Makes a mongodb connection
 
@@ -246,12 +253,12 @@ def make_mongodb_client(db_type: DBType) -> Database[Mapping[str, Any] | Any]:
     host = data["host"]
     port = data["port"]
 
-    # If the name is 'ALL', then get the db with the name in the config file
-    if db_type.name.lower() == 'all':
+    # If the name_suffix is 'ALL', then get the db with the name_suffix in the config file
+    if db_type.name_suffix.lower() == 'all' or db_type is None:
         db_name = data["db_name"]
     else:
-        db_name = f"{data['db_name']}_{db_type.name}"
-    
+        db_name = f"{data['db_name']}_{db_type.name_suffix}"
+
     custom_engine_url = data["custom_engine_url"]
     # Connect to MongoDB
     if custom_engine_url is not None:
@@ -278,7 +285,7 @@ def update_summary_log(db_type: DBType, data_file: str, start_time: datetime, en
     :param chunk_size: number of lines written to the sql database at a time
     :param sql_writes: number of sql writes
     """
-    summary_path = f"logs/summaries/summary_{db_type.to_string()}_{db_type.name}.json"
+    summary_path = f"logs/summaries/summary_{db_type.to_string()}_{db_type.name_suffix}.json"
     current_summary = load_json(summary_path)
 
     begin_time_formatted = start_time.strftime("%d %B %Y %H:%M.%S")
