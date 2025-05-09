@@ -15,8 +15,8 @@ os.makedirs('databases', exist_ok=True)
 check_files()
 
 # Make engine
-db_type_postgresql = DBType(db_type=DBTypes.POSTGRESQL, name='ALL')
-engine = make_postgres_engine()
+db_type_postgresql = DBType(db_type=DBTypes.POSTGRESQL, name_suffix='20m', max_rows=20_000_000)
+engine = make_postgres_engine(db_type_postgresql)
 
 main(engine, db_type_postgresql)
 

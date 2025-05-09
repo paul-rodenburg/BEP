@@ -13,7 +13,7 @@ os.chdir(parent_directory)
 os.makedirs('databases', exist_ok=True)
 
 DB_NAME = load_json('config.json')['mysql']['db_name']
-db_type_mysql = DBType(db_type=DBTypes.MYSQL, name='20m', max_rows=20_000_000)
+db_type_mysql = DBType(db_type=DBTypes.MYSQL, name_suffix='20m', max_rows=20_000_000)
 
 # Make engine (set db_type to None because it can be that the database doesn't exist yet)
 engine = make_mysql_engine(db_type=None)
@@ -23,7 +23,7 @@ check_files(db_type=db_type_mysql)
 
 # Create a new database
 with engine.connect() as conn:
-    conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {DB_NAME}"))
+    conn.execute(text(f"CREATE DATABASE IF NOT EXISTS reddit_data_{db_type_mysql.name_suffix}"))
     conn.commit()
 
 # Make engine again if the database needed to be created

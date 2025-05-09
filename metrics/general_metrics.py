@@ -41,7 +41,7 @@ def update_query_metrics(db_type: DBType, query_name: str, time: float, memory: 
     :param output_length: Length of the output dataframe.
     :param query_metrics_file_base_name: JSON base name for the query times.
     """
-    path = f'{query_metrics_file_base_name}_{db_type.get_type().display_name.lower()}_{db_type.name}.json'
+    path = f'{query_metrics_file_base_name}_{db_type.get_type().display_name.lower()}_{db_type.name_suffix}.json'
     current_metrics_data = load_json(path)
     if query_name not in current_metrics_data:
         current_metrics_data[query_name] = {}

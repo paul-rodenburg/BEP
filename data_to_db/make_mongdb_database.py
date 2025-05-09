@@ -25,7 +25,7 @@ check_files()
 pbar = None
 
 # Make db_type object for MongoDB database
-db_type = DBType(DBTypes.MONGODB, name='20m', max_rows=20_000_000)
+db_type = DBType(DBTypes.MONGODB, name_suffix='20m', max_rows=20_000_000)
 
 # Set up the logger
 os.makedirs("logs/summaries", exist_ok=True)
@@ -44,7 +44,7 @@ else:
 chunk_size = data['mongodb']['chunk_size']
 
 db = make_mongodb_client(db_type)
-db_info_file = f'databases/db_info_mongodb_{db_type.name}.json'
+db_info_file = f'databases/db_info_mongodb_{db_type.name_suffix}.json'
 
 print(f'[{db_type.display_name}] Max rows: {maximum_rows_database:,}')
 

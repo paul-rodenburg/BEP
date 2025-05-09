@@ -59,7 +59,7 @@ if __name__ == "__main__":
     os.chdir(parent_directory)
 
     # Make db_type object
-    db_type = DBType(db_type=DBTypes.MONGODB, name="ALL")
+    db_type = DBType(db_type=DBTypes.MONGODB, name_suffix="ALL")
     query_metrics_file_base_name = 'metrics/output/query_metrics'
     db = make_mongodb_client()
 

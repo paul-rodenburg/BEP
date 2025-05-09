@@ -1,9 +1,9 @@
 {
   "mysql": {
     "username": "root",
-    "password": null,
+    "password": "admin",
     "host": "localhost",
-    "db_name": "reddit_data_ALL",
+    "db_name": "ALL",
     "custom_engine_url": null,
     "chunk_size": 10000
   },
@@ -16,14 +16,14 @@
     "password": "admin",
     "host": "localhost",
     "port": "5432",
-    "db_name": "reddit_data_ALL",
+    "db_name": "ALL",
     "custom_engine_url": null,
     "chunk_size": 10000
   },
   "mongodb": {
     "host": "localhost",
     "port": "27017",
-    "db_name": "reddit_data",
+    "db_name": "ALL",
     "custom_engine_url": null,
     "chunk_size": 1000
   },

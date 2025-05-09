@@ -78,6 +78,9 @@ def should_skip(line: dict|list[dict], primary_keys: list) -> bool:
     :return: True if the line should be skipped, False otherwise.
 
     """
+    if isinstance(line, list):
+        print(line)
+
     # Check if any primary key value is None
     if isinstance(line, list):
         line = line[0]
@@ -173,14 +176,14 @@ def clean_line(line_input: str, tables: list, table_columns: dict, ignored_autho
 seen_authors = set()
 
 def process_cleaned_lines(cleaned_lines_dct) -> dict[str, pd.DataFrame]:
-    global seen_authors
-
     """
     Converts cleaned line entries to DataFrames, optionally ensuring globally unique rows based on primary keys.
 
     :param cleaned_lines_dct: cleaned lines dictionary
     :return: A dict with the table name as key and a DataFrame (deduplicated if authors) as value.
     """
+    global seen_authors
+
     for table_name, data in cleaned_lines_dct.items():
         if not data:
             cleaned_lines_dct[table_name] = None
@@ -442,10 +445,6 @@ def delete_table_db(table_name: str, engine: Engine, db_type: DBType, schema_tab
     # Global variables
     global delete_all
 
-    # Detect if table name is not a system one
-    if table_name not in schema_tables:  # It is a system table we don't want to delete that
-        return None
-
     with engine.connect() as conn:
         if table_exists(conn, table_name, db_type):
             if delete_all:
@@ -560,8 +559,12 @@ def set_index(engine: Engine, table_name: str, db_type: DBType):
 
                 # Drop the index if it exists
                 if result:
-                    drop_index_query = text(f"DROP INDEX index_{pm} ON {table_name}")
-                    conn.execute(drop_index_query)
+                    try:
+                        drop_index_query = text(f"DROP INDEX index_{pm} ON {table_name}")
+                        conn.execute(drop_index_query)
+                    except Exception as e:
+                        print(f"[{db_type.display_name}] Error removing index index_{pm} on {table_name}: {e}")
+                        print('Will just set the index now...')
 
                 # Check if the column is of type TEXT or BLOB
                 column_type_query = text(f"""
@@ -631,6 +634,8 @@ def generate_create_table_statement(table_name: str, schema_json_file: str, db_t
         for col_name, col_type in table["columns"].items():
             if col_name in character_lengths_data:
                 length = character_lengths_data[col_name]
+                if 'selftext' in col_name:  # Make sure that selftext has always the maximum length of character since this value is always long
+                    length = MAX_MYSQL_TEXT_LENGTH
             else:
                 length = MAX_MYSQL_TEXT_LENGTH
             if length >= MAX_MYSQL_TEXT_LENGTH:
@@ -726,7 +731,7 @@ def main(engine: Engine, db_type: DBType):
     # Set up the logger
     os.makedirs("logs/summaries", exist_ok=True)
     time_now = time.time()
-    log_basename = f'sql_{time_now}.txt'
+    log_basename = f'data_to_sql_{time_now}.txt'
     log_filename = f"logs/{log_basename}"
     logger = Logger(log_filename)
     sys.stdout = logger
@@ -734,11 +739,11 @@ def main(engine: Engine, db_type: DBType):
     # Set the path for the db info file according to the db type
     match db_type.get_type():
         case DBTypes.SQLITE:
-            db_info_file = f'databases/db_info_sqlite_{db_type.name}.json'
+            db_info_file = f'databases/db_info_sqlite_{db_type.name_suffix}.json'
         case DBTypes.POSTGRESQL:
-            db_info_file = f'databases/db_info_postgresql_{db_type.name}.json'
+            db_info_file = f'databases/db_info_postgresql_{db_type.name_suffix}.json'
         case DBTypes.MYSQL:
-            db_info_file = f'databases/db_info_mysql_{db_type.name}.json'
+            db_info_file = f'databases/db_info_mysql_{db_type.name_suffix}.json'
         case _:
             raise ValueError(f'[{db_type.display_name}] Unknown database type: {db_type}')
 

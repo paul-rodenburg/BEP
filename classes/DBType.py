@@ -19,10 +19,10 @@ class DBTypes(Enum):
         return self.value in ["mysql", "sqlite", "postgresql"]
 
 class DBType:
-    def __init__(self, db_type: DBTypes, name: str, max_rows: int = None):
+    def __init__(self, db_type: DBTypes, name_suffix: str, max_rows: int = None):
         if isinstance(db_type, DBTypes):
             self.db_type = db_type
-            self.name = name
+            self.name_suffix = name_suffix
             self.max_rows = max_rows
         else:
             raise ValueError(f"Invalid DBType: {db_type}")
@@ -46,4 +46,4 @@ class DBType:
 
     @property
     def display_name(self) -> str:
-        return f'{self.db_type.display_name}_{self.name}'
+        return f'{self.db_type.display_name}_{self.name_suffix}'

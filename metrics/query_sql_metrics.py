@@ -197,10 +197,10 @@ if __name__ == '__main__':
     query_metrics_file_base_name = 'metrics/output/query_metrics'
     queries_sql_json = load_json('metrics/queries_sql_SUBSET.json')
 
-    # db_types = [DBType(db_type=DBTypes.SQLITE, name='20m'), DBType(db_type=DBTypes.POSTGRESQL, name='20m'),
-    #             DBType(db_type=DBTypes.MYSQL, name='20m')]
+    # db_types = [DBType(db_type=DBTypes.SQLITE, name_suffix='20m'), DBType(db_type=DBTypes.POSTGRESQL, name_suffix='20m'),
+    #             DBType(db_type=DBTypes.MYSQL, name_suffix='20m')]
 
-    db_types = [DBType(db_type=DBTypes.SQLITE, name='ALL')]
+    db_types = [DBType(db_type=DBTypes.SQLITE, name_suffix='ALL')]
 
     # Get existing queries
     sqlite_q = load_json(f'{query_metrics_file_base_name}_sqlite_20m.json')
