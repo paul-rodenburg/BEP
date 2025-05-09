@@ -43,6 +43,7 @@ def execute_queries(query_definitions: dict, db_type: DBType, query_metrics_file
         for q in queries:
             pbar.update(1)
             pbar.set_postfix_str(f'{db_type.display_name}: {q["name"]}')
+            print(q)
             output_length, execution_time, memory = execute_query(q["query"], db)
 
             # Update metrics
@@ -59,9 +60,9 @@ if __name__ == "__main__":
     os.chdir(parent_directory)
 
     # Make db_type object
-    db_type = DBType(db_type=DBTypes.MONGODB, name_suffix="ALL")
+    db_type = DBType(db_type=DBTypes.MONGODB, name_suffix="20m")
     query_metrics_file_base_name = 'metrics/output/query_metrics'
-    db = make_mongodb_client()
+    db = make_mongodb_client(db_type)
 
     # Execute queries
     queries = get_queries()
