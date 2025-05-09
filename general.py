@@ -250,7 +250,7 @@ def make_mongodb_client(db_type: DBType) -> Database[Mapping[str, Any] | Any]:
     if db_type.name.lower() == 'all':
         db_name = data["db_name"]
     else:
-        db_name = f"{data["db_name"]}_{db_type.name}"
+        db_name = f"{data['db_name']}_{db_type.name}"
     
     custom_engine_url = data["custom_engine_url"]
     # Connect to MongoDB
