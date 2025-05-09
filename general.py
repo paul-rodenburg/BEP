@@ -109,7 +109,7 @@ def get_tables_database(engine: Engine, db_type: DBType):
 
     :raises ValueError: if the connection type is not supported
     """
-    match db_type:
+    match db_type.get_type():
         case DBTypes.SQLITE:
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table';"))
@@ -179,14 +179,14 @@ def get_count_rows_database(conn, table_name):
     return count
 
 
-def make_sqlite_engine():
+def make_sqlite_engine(db_type: DBType):
     """
     Makes a sqlite connection
     :return: a sqlite connection
     """
     data = load_json('config.json')['sqlite']
-    db_location_relative = data['db_location_relative']
-    engine = create_engine(f'sqlite:///{db_location_relative}')
+    db_folder = data['db_folder']
+    engine = create_engine(f'sqlite:///{db_folder}/reddit_data_{db_type.name}.db')
     return engine
 
 
@@ -270,7 +270,7 @@ def update_summary_log(db_type: DBType, data_file: str, start_time: datetime, en
     :param chunk_size: number of lines written to the sql database at a time
     :param sql_writes: number of sql writes
     """
-    summary_path = f"logs/summaries/summary_{db_type.to_string()}.json"
+    summary_path = f"logs/summaries/summary_{db_type.to_string()}_{db_type.name}.json"
     current_summary = load_json(summary_path)
 
     begin_time_formatted = start_time.strftime("%d %B %Y %H:%M.%S")

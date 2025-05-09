@@ -8,7 +8,7 @@
     "chunk_size": 10000
   },
   "sqlite": {
-    "db_location_relative": "databases/reddit_data_ALL.db",
+    "db_folder": "databases",
     "chunk_size": 10000
   },
   "postgresql": {
@@ -27,7 +27,7 @@
     "custom_engine_url": null,
     "chunk_size": 1000
   },
-  "maximum_rows_database": 80000000,
+  "maximum_rows_database": 20000000,
   "dates_data_files_process_order": [
     "2025-1",
     "2024-12",

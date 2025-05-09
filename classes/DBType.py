@@ -19,9 +19,13 @@ class DBTypes(Enum):
         return self.value in ["mysql", "sqlite", "postgresql"]
 
 class DBType:
-    def __init__(self, db_type: DBTypes = None):
-        self.db_type = db_type
-
+    def __init__(self, db_type: DBTypes, name: str, max_rows: int = None):
+        if isinstance(db_type, DBTypes):
+            self.db_type = db_type
+            self.name = name
+            self.max_rows = max_rows
+        else:
+            raise ValueError(f"Invalid DBType: {db_type}")
     def is_type(self, db_type: DBTypes) -> bool:
         return self.db_type == db_type
 
@@ -36,3 +40,6 @@ class DBType:
 
     def to_string_capitalized(self) -> str:
         return self.db_type.display_name if self.db_type else "Unknown"
+
+    def is_sql(self) -> bool:
+        return self.db_type.is_sql()

@@ -453,7 +453,7 @@ def delete_table_db(table_name: str, engine: Engine, db_type: DBType):
         else:  # Table does not exist
             pass
 
-    match db_type:
+    match db_type.get_type():
         case DBTypes.SQLITE:
             with engine.connect() as conn:
                 conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
@@ -723,13 +723,13 @@ def main(engine: Engine, db_type: DBType):
     sys.stdout = logger
 
     # Set the path for the db info file according to the db type
-    match db_type:
+    match db_type.get_type():
         case DBTypes.SQLITE:
-            db_info_file = 'databases/db_info_sqlite_ALL.json'
+            db_info_file = f'databases/db_info_sqlite_{db_type.name}.json'
         case DBTypes.POSTGRESQL:
-            db_info_file = 'databases/db_info_postgresql_ALL.json'
+            db_info_file = f'databases/db_info_postgresql_{db_type.name}.json'
         case DBTypes.MYSQL:
-            db_info_file = 'databases/db_info_mysql_ALL.json'
+            db_info_file = f'databases/db_info_mysql_{db_type.name}.json'
         case _:
             raise ValueError(f'[{db_type.to_string_capitalized()}] Unknown database type: {db_type}')
 
@@ -763,7 +763,13 @@ def main(engine: Engine, db_type: DBType):
     data = load_json('config.json')
     data_files = list(data['data_files_tables'].keys())
     data_files_tables = data['data_files_tables']
-    maximum_rows_database = data['maximum_rows_database']
+
+    # Set maximum rows database
+    if db_type.max_rows:
+        maximum_rows_database = db_type.max_rows
+    else:
+        maximum_rows_database = data['maximum_rows_database']
+
     chunk_size = data[db_type.to_string()]['chunk_size']
 
     create_tables_from_sql(engine, db_type)
