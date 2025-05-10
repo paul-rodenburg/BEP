@@ -24,23 +24,30 @@ def get_queries():
             "query_type": "join",
             "queries": [
                 {
-                    "name": "join_posts_with_authors",
+                    "name": "join_posts_with_comments",
                     "query": lambda db: list(db["post"].aggregate([
                         {
                             "$lookup": {
-                                "from": "author",
-                                "localField": "author_fullname",
-                                "foreignField": "author_fullname",
-                                "as": "author_info"
+                                "from": "comment",
+                                "localField": "id",
+                                "foreignField": "link_id",
+                                "as": "comments"
                             }
                         },
-                        { "$unwind": "$author_info" },
+                        {"$limit": 5},  # Optional: limit output for testing
                         {
                             "$project": {
                                 "_id": 0,
                                 "id": 1,
                                 "title": 1,
-                                "author": "$author_info.author"
+                                "num_comments": {"$size": "$comments"},
+                                "comments": {
+                                    "$map": {
+                                        "input": "$comments",
+                                        "as": "c",
+                                        "in": "$$c.body"
+                                    }
+                                }
                             }
                         }
                     ]))
@@ -144,7 +151,7 @@ def get_queries():
                         lambda top_post_id: list(
                             db["comment"].find(
                                 {"link_id": top_post_id},
-                                {"_id": 0, "author_fullname": 1}
+                                {"id": 0, "author_fullname": 1}
                             )
                         )
                     )(db["post"].find_one(sort=[("score", -1)])["id"])

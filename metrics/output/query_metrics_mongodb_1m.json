@@ -1,0 +1,104 @@
+{
+  "join_posts_with_comments": {
+    "times": [
+      0.0061,
+      15.9119
+    ],
+    "memories": [
+      13.0908,
+      159.4355
+    ],
+    "output_lengths": [
+      0,
+      5
+    ]
+  },
+  "join_posts_with_subreddits": {
+    "times": [
+      0.001
+    ],
+    "memories": [
+      6.6865
+    ],
+    "output_lengths": [
+      0
+    ]
+  },
+  "join_comments_with_posts": {
+    "times": [
+      0.001
+    ],
+    "memories": [
+      6.6191
+    ],
+    "output_lengths": [
+      0
+    ]
+  },
+  "advanced_top_posts_by_score": {
+    "times": [
+      0.002
+    ],
+    "memories": [
+      6.418
+    ],
+    "output_lengths": [
+      0
+    ]
+  },
+  "advanced_average_comments_per_post": {
+    "times": [
+      0.0025
+    ],
+    "memories": [
+      6.4941
+    ],
+    "output_lengths": [
+      0
+    ]
+  },
+  "advanced_active_subreddits_by_post_count": {
+    "times": [
+      0.001
+    ],
+    "memories": [
+      6.5713
+    ],
+    "output_lengths": [
+      0
+    ]
+  },
+  "nested_top_commenters_on_top_post": {
+    "times": [
+      -1
+    ],
+    "memories": [
+      -1
+    ],
+    "output_lengths": [
+      -1
+    ]
+  },
+  "nested_posts_by_most_active_author": {
+    "times": [
+      -1
+    ],
+    "memories": [
+      -1
+    ],
+    "output_lengths": [
+      -1
+    ]
+  },
+  "nested_subreddits_with_high_avg_score": {
+    "times": [
+      0.001
+    ],
+    "memories": [
+      20.8701
+    ],
+    "output_lengths": [
+      0
+    ]
+  }
+}

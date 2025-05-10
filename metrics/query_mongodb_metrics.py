@@ -2,12 +2,12 @@ import os
 import time
 import tracemalloc
 from typing import Tuple
+from pymongo import MongoClient
 from tqdm import tqdm
 from general_metrics import update_query_metrics, get_total_queries_number
 from queries_mongodb import get_queries
 from collections.abc import Sized
 from classes.DBType import DBTypes, DBType
-from general import make_mongodb_client
 
 
 
@@ -26,16 +26,20 @@ def execute_query(query, db) -> Tuple[int, float, float]:
         end_time = time.time()
         current_memory, peak_memory = tracemalloc.get_traced_memory()
         tracemalloc.stop()
+
         if isinstance(result, Sized):
             return len(result), end_time - begin_time, peak_memory / 1024
         else:
             return 1, end_time - begin_time, peak_memory / 1024
     except Exception as e:
-        raise ValueError(f"Error executing '{query}': {e}")
+        print(f'Error with q: {query}\nError: {e}')
+        return -1, -1, -1
+        # raise ValueError(f"Error executing '{query}': {e}")
 
 
 # Execute and print results
-def execute_queries(query_definitions: dict, db_type: DBType, query_metrics_file_base_name: str, db):
+def execute_queries(query_definitions: dict, db_type: DBType, query_metrics_file_base_name: str):
+    db = MongoClient('mongodb://localhost:27017/')[f'reddit_data_{db_type.name_suffix}']
 
     pbar = tqdm(total=get_total_queries_number(query_definitions, [db_type]), desc='Executing queries')
     for group_name, group in query_definitions.items():
@@ -43,7 +47,6 @@ def execute_queries(query_definitions: dict, db_type: DBType, query_metrics_file
         for q in queries:
             pbar.update(1)
             pbar.set_postfix_str(f'{db_type.display_name}: {q["name"]}')
-            print(q)
             output_length, execution_time, memory = execute_query(q["query"], db)
 
             # Update metrics
@@ -60,10 +63,9 @@ if __name__ == "__main__":
     os.chdir(parent_directory)
 
     # Make db_type object
-    db_type = DBType(db_type=DBTypes.MONGODB, name_suffix="20m")
+    db_type = DBType(db_type=DBTypes.MONGODB, name_suffix="1m")
     query_metrics_file_base_name = 'metrics/output/query_metrics'
-    db = make_mongodb_client(db_type)
 
     # Execute queries
     queries = get_queries()
-    execute_queries(queries, db_type, query_metrics_file_base_name, db)
+    execute_queries(queries, db_type, query_metrics_file_base_name)

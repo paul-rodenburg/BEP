@@ -25,7 +25,7 @@ check_files()
 pbar = None
 
 # Make db_type object for MongoDB database
-db_type = DBType(DBTypes.MONGODB, name_suffix='20m', max_rows=20_000_000)
+db_type = DBType(DBTypes.MONGODB, name_suffix='1m', max_rows=1_000_000)
 
 # Set up the logger
 os.makedirs("logs/summaries", exist_ok=True)
@@ -48,7 +48,9 @@ db_info_file = f'databases/db_info_mongodb_{db_type.name_suffix}.json'
 
 print(f'[{db_type.display_name}] Max rows: {maximum_rows_database:,}')
 
+count = 0
 for data_file, tables_file in data_files_tables.items():
+    count += 1
     collection_name = tables_file['mongodb']
     if not is_file_tables_added_db(data_file, collection_name, db_info_file):
         print(f'[{db_type.display_name}] Skipping {collection_name}...')
@@ -76,7 +78,7 @@ for data_file, tables_file in data_files_tables.items():
         buffer = []
         total_lines = min(get_line_count_file(data_file), maximum_rows_database)
         line_count = 0
-        pbar = tqdm(total=total_lines, desc=f"[{db_type.display_name}] Importing {collection_name} data to MongoDB collection {collection_name}", unit="docs")
+        pbar = tqdm(total=total_lines, desc=f"[{db_type.display_name}] Importing {collection_name} data to MongoDB collection {collection_name} [{count}/{len(data_files_tables)}]", unit="docs")
         for line in islice(file, maximum_rows_database):
             line_count += 1
             pbar.update(1)

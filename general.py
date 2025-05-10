@@ -252,12 +252,7 @@ def make_mongodb_client(db_type: DBType=None) -> Database[Mapping[str, Any] | An
     data = load_json('config.json')['mongodb']
     host = data["host"]
     port = data["port"]
-    db_name = data["db_name"]
-    # If the name_suffix is 'ALL', then get the db with the name_suffix in the config file
-    if db_type is None or db_type.name_suffix.lower() == 'all':
-        db_name = data["db_name"]
-    else:
-        db_name = f"{data['db_name']}_{db_type.name_suffix}"
+    db_name = f"reddit_data_{db_type.name_suffix}"
 
     custom_engine_url = data["custom_engine_url"]
     # Connect to MongoDB
