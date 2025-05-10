@@ -101,6 +101,8 @@ for data_file, tables_file in data_files_tables.items():
             collection.insert_many(buffer)
             pbar.update(len(buffer))
 
+        pbar.close()
+
         # Creating index
         if isinstance(pm, list):
             for primary_key in pm:
@@ -117,7 +119,6 @@ for data_file, tables_file in data_files_tables.items():
                            start_time=start_time, end_time=end_time,
                            line_count=line_count, total_lines=total_lines,
                            tables=None, chunk_size=chunk_size, sql_writes=None)
-    pbar.close()
 
 
     add_file_table_db_info(data_file, collection_name, db_info_file)
