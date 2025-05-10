@@ -78,8 +78,6 @@ def should_skip(line: dict|list[dict], primary_keys: list) -> bool:
     :return: True if the line should be skipped, False otherwise.
 
     """
-    if isinstance(line, list):
-        print(line)
 
     # Check if any primary key value is None
     if isinstance(line, list):

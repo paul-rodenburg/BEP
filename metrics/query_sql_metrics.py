@@ -200,11 +200,10 @@ if __name__ == '__main__':
     # db_types = [DBType(db_type=DBTypes.SQLITE, name_suffix='20m'), DBType(db_type=DBTypes.POSTGRESQL, name_suffix='20m'),
     #             DBType(db_type=DBTypes.MYSQL, name_suffix='20m')]
 
-    db_types = [DBType(db_type=DBTypes.SQLITE, name_suffix='ALL')]
+    db_types = [DBType(db_type=DBTypes.SQLITE, name_suffix='20m')]
 
     # Get existing queries
-    sqlite_q = load_json(f'{query_metrics_file_base_name}_sqlite_20m.json')
-    existing_queries = set(sqlite_q.keys())
+    existing_queries = set()
 
     if TEST:
         # First, test all queries

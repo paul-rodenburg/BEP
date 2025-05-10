@@ -3,9 +3,10 @@ from datetime import datetime
 import re
 import hashlib
 from classes.DBType import DBType, DBTypes
+from data_to_db.data_to_sql import should_skip, get_primary_key
 
 class SubredditRulesCleaner(BaseCleaner):
-    def clean(self, line: dict) -> list[dict]:
+    def clean(self, line: dict) -> list[dict]|None:
         """
         Helper method to process a line for the subreddit_rules table. Unpacks the rule dictionary.
 
@@ -21,8 +22,11 @@ class SubredditRulesCleaner(BaseCleaner):
             rule_hash = hashlib.md5(rule_string.encode()).hexdigest()
 
             rule = {"rule_id": rule_hash, **rule, "subreddit": subreddit}  # Put rule_id first for readability
-            lines_rules_cleaned.append(rule)
+            if not should_skip(rule, get_primary_key("subreddit_rules")):
+                lines_rules_cleaned.append(rule)
 
+        if len(lines_rules_cleaned) == 0:
+            return None
         return lines_rules_cleaned
 
 class RemovedCleaner(BaseCleaner):
