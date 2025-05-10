@@ -2,7 +2,19 @@
 
 ## Download data
 
-### (WARNING: Make sure to have at least 1.5TB free space as the files are really big)
+<div style="
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 0, 25, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  text-align: center;
+  padding: 10px;
+  border-radius: 10px;
+  color: white;
+">
+  <strong>⚠️ Warning:</strong> Make sure to have at least 1.5TB free space as the files are really big.
+</div>
+<br>
 
 1. Download a program that can download torrents (for example [Transmission](https://transmissionbt.com/))
 2. Go to [Reddit comments/submissions 2025-01](https://academictorrents.com/details/4fd14d4c3d792e0b1c5cf6b1d9516c48ba6c4a24) and download .torrent file
