@@ -2,6 +2,7 @@
   "post": {
     "columns": {
       "id": "text",
+      "name": "text",
       "allow_live_comments": "bool",
       "archived": "bool",
       "author_fullname": "text",
@@ -51,7 +52,7 @@
       "upvote_ratio": "float",
       "url": "text"
     },
-    "primary_keys": ["id"],
+    "primary_keys": ["name"],
     "foreign_keys": [
       {
         "column": "author_fullname",
@@ -262,7 +263,7 @@
   "comment": {
     "columns": {
       "id": "text",
-      "archived":  "bool",
+      "archived": "bool",
       "author_fullname": "text",
       "author_is_blocked": "bool",
       "author_patreon_flair": "bool",

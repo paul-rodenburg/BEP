@@ -29,7 +29,7 @@
       },
       {
         "name": "join_comments_with_posts",
-        "query": "SELECT c.id AS comment_id, p.title AS post_title FROM comment c JOIN post p ON c.parent_id = p.id"
+        "query": "SELECT c.id AS comment_id, p.title AS post_title FROM comment c JOIN post p ON c.parent_id = p.name"
       }
     ]
   },
@@ -55,11 +55,11 @@
     "queries": [
       {
         "name": "nested_top_commenters_on_top_post",
-        "query": "SELECT author_fullname FROM comment WHERE link_id = (SELECT id FROM post ORDER BY score DESC LIMIT 1)"
+        "query": "SELECT author_fullname FROM comment WHERE parent_id IN (SELECT name FROM post ORDER BY score DESC LIMIT 50)"
       },
       {
         "name": "nested_posts_by_most_active_author",
-        "query": "SELECT id, title FROM post WHERE author_fullname = (SELECT author_fullname FROM post GROUP BY author_fullname ORDER BY COUNT(*) DESC LIMIT 1)"
+        "query": "SELECT id, title FROM post WHERE author_fullname = (SELECT author_fullname FROM post WHERE author_fullname IS NOT NULL GROUP BY author_fullname ORDER BY COUNT(*) DESC LIMIT 1)"
       },
       {
         "name": "nested_subreddits_with_high_avg_score",
