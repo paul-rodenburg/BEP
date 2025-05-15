@@ -13,14 +13,18 @@ import psycopg2
 from sqlalchemy import create_engine
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
-def load_json(file_path) -> dict | list:
+def load_json(file_path, make_file_if_not_exists=True) -> dict | list:
     """
-    Loads the content of a json file.
+    Loads the content of a JSON file.
 
-    :param file_path: path to the json file
+    :param file_path: Path to the JSON file
+    :param make_file_if_not_exists: if True, creates the file if it doesn't exist
 
-    :return: a dict with the content of the json file
+    :return: A dict with the content of the JSON file
     """
+    if not os.path.isfile(file_path) and not make_file_if_not_exists:
+        raise FileNotFoundError(f"File {file_path} does not exist. You can set the parameter 'make_file_if_not_exists' to True to create the file.")
+
     if not os.path.isfile(file_path):
         with open(file_path, 'wb') as f:
             f.write(json.dumps({}))
@@ -36,13 +40,16 @@ def load_json(file_path) -> dict | list:
 _json_cache = {}
 
 
-def load_json_cached(file_path) -> dict | list:
+def load_json_cached(file_path, make_file_if_not_exists=True) -> dict | list:
     """
     Loads JSON from a file, with in-memory caching.
     If the file was already loaded, returns the cached version.
+
+    :param file_path: path to the JSON file
+    :param make_file_if_not_exists: if True, creates the file if it doesn't exist
     """
     if file_path not in _json_cache:
-        _json_cache[file_path] = load_json(file_path)
+        _json_cache[file_path] = load_json(file_path, make_file_if_not_exists)
     return _json_cache[file_path]
 
 
@@ -203,7 +210,7 @@ def make_postgres_engine(db_type: DBType = None):
     exists = cur.fetchone()
     if not exists:
         cur.execute(f'CREATE DATABASE "{db_name}"')
-        print(f"[{db_type.display_name}] Database '{db_name}' created.")
+        print(f"[PostgreSQL] Database '{db_name}' created.")
 
     cur.close()
     conn.close()
@@ -299,3 +306,31 @@ def update_summary_log(db_type: DBType, data_file: str, start_time: datetime, en
         del info_to_add_log['sql_writes']
     current_summary[data_file] = info_to_add_log
     write_json(current_summary, summary_path)
+
+
+def should_skip(line: dict|list[dict], primary_keys: list) -> bool:
+    """
+    Determines whether the line should be skipped based on the primary keys and other values.
+    If any primary key value is None, the line is skipped. If all other values are None, the line is also skipped.
+
+    :param line: Line to check.
+    :param primary_keys: Primary keys to check.
+
+    :return: True if the line should be skipped, False otherwise.
+
+    """
+
+    # Check if any primary key value is None or empty
+    if isinstance(line, list):
+        line = line[0]
+    if any(line.get(key) is None or line.get(key) == '' for key in primary_keys):
+        return True
+
+    # Get all other keys not in primary_keys
+    other_keys = [k for k in line.keys() if k not in primary_keys]
+
+    # If all other values are None or empty
+    if all(line.get(k) is None or line.get(k) == '' for k in other_keys):
+        return True
+    return False
+

@@ -11,12 +11,14 @@ from sqlalchemy import text, Engine, Connection
 from tqdm import tqdm
 from general import get_tables_database, write_json, update_summary_log
 from general import load_json_cached as load_json
+from general import load_json as load_json_no_cache
 from line_counts import get_line_count_file
 import sys
 import time
 from classes.cleaners import *
 from classes.BaseCleaner import BaseCleaner
 from datetime import datetime
+from general import should_skip
 
 progress_bar = None
 clean_errors = 0
@@ -66,32 +68,6 @@ def get_table_columns(json_schema_path, table_name) -> list:
     columns = list(schema[table_name]['columns'].keys())
     return columns
 
-
-def should_skip(line: dict|list[dict], primary_keys: list) -> bool:
-    """
-    Determines whether the line should be skipped based on the primary keys and other values.
-    If any primary key value is None, the line is skipped. If all other values are None, the line is also skipped.
-
-    :param line: Line to check.
-    :param primary_keys: Primary keys to check.
-
-    :return: True if the line should be skipped, False otherwise.
-
-    """
-
-    # Check if any primary key value is None
-    if isinstance(line, list):
-        line = line[0]
-    if any(line.get(key) is None for key in primary_keys):
-        return True
-
-    # Get all other keys not in primary_keys
-    other_keys = [k for k in line.keys() if k not in primary_keys]
-
-    # If all other values are None
-    if all(line.get(k) is None for k in other_keys):
-        return True
-    return False
 
 def get_cleaner(table: str, db_type: DBType, ignored_author_names: set) -> BaseCleaner:
     """
@@ -150,14 +126,14 @@ def clean_line(line_input: str, tables: list, table_columns: dict, ignored_autho
     for table in tables:
         line = line_input
         items_to_keep = table_columns[table]
-
+        pm = get_primary_key(table)
         cleaner = get_cleaner(table, db_type, ignored_author_names)
-        line = cleaner.clean(line)
+        line = cleaner.clean(line, pm)
         if line is None:
             continue
 
         # If the value of the primary key(s) is/are null or all other values are null, then skip this line
-        if should_skip(line, get_primary_key(table)):
+        if should_skip(line, pm):
             continue
         if not isinstance(line, list):
             line = [line]
@@ -369,7 +345,7 @@ def add_file_table_db_info(data_file, tables, db_info_file):
     if not isinstance(tables, list):
         tables = [tables]
 
-    data = load_json(db_info_file)
+    data = load_json_no_cache(db_info_file)
 
     file_entry = next((obj for obj in data if obj['file'] == data_file), None)
 
@@ -395,24 +371,6 @@ def get_tables_to_skip(json_data) -> set:
         if "duplicates_removed" in entry:
             tables_to_skip.update(entry["duplicates_removed"])
     return tables_to_skip
-
-def update_json_with_table_duplicates(json_file, table_name, data_file):
-    """
-    Adds the table names of tables where duplicates are removed to the database-specific info JSON file.
-
-    :param json_file: Path to the JSON file with database-specific info
-    :param table_name: table name of table where duplicates are removed
-    :param data_file: path to the file with reddit data
-
-    """
-    json_data = load_json(json_file)
-    for entry in json_data:
-        if "success_tables" in entry and table_name in entry["success_tables"] and data_file in entry["file"]:
-            if "duplicates_removed" not in entry:
-                entry["duplicates_removed"] = []
-            if table_name not in entry["duplicates_removed"]:
-                entry["duplicates_removed"].append(table_name)
-    write_json(json_data, json_file)
 
 def clean_json_duplicates(json_file):
     """

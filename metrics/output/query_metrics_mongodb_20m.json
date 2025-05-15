@@ -1,13 +1,35 @@
 {
-  "join_posts_with_comments": {
+  "simple_select_authors": {
     "times": [
-      1747.1249
+      -1
     ],
     "memories": [
-      332.4814
+      -1
     ],
     "output_lengths": [
-      5
+      -1
+    ]
+  },
+  "simple_count_posts": {
+    "times": [
+      -1
+    ],
+    "memories": [
+      -1
+    ],
+    "output_lengths": [
+      -1
+    ]
+  },
+  "simple_unique_subreddits": {
+    "times": [
+      -1
+    ],
+    "memories": [
+      -1
+    ],
+    "output_lengths": [
+      -1
     ]
   }
 }

@@ -5,7 +5,7 @@ from typing import Tuple
 from pymongo import MongoClient
 from tqdm import tqdm
 from general_metrics import update_query_metrics, get_total_queries_number
-from queries_mongodb import get_queries
+from queries_mongodb_simple import get_queries
 from collections.abc import Sized
 from classes.DBType import DBTypes, DBType
 
@@ -47,7 +47,8 @@ def execute_queries(query_definitions: dict, db_type: DBType, query_metrics_file
         for q in queries:
             pbar.update(1)
             pbar.set_postfix_str(f'{db_type.display_name}: {q["name"]}')
-            output_length, execution_time, memory = execute_query(q["query"], db)
+            collection = db[q["collection"]]
+            output_length, execution_time, memory = execute_query(q["query"], collection)
 
             # Update metrics
             update_query_metrics(db_type=db_type, query_name=q['name'], memory=memory,
@@ -63,7 +64,7 @@ if __name__ == "__main__":
     os.chdir(parent_directory)
 
     # Make db_type object
-    db_type = DBType(db_type=DBTypes.MONGODB, name_suffix="1m")
+    db_type = DBType(db_type=DBTypes.MONGODB, name_suffix="20m")
     query_metrics_file_base_name = 'metrics/output/query_metrics'
 
     # Execute queries

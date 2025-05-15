@@ -100,5 +100,38 @@
     "output_lengths": [
       0
     ]
+  },
+  "simple_select_authors": {
+    "times": [
+      -1
+    ],
+    "memories": [
+      -1
+    ],
+    "output_lengths": [
+      -1
+    ]
+  },
+  "simple_count_posts": {
+    "times": [
+      -1
+    ],
+    "memories": [
+      -1
+    ],
+    "output_lengths": [
+      -1
+    ]
+  },
+  "simple_unique_subreddits": {
+    "times": [
+      -1
+    ],
+    "memories": [
+      -1
+    ],
+    "output_lengths": [
+      -1
+    ]
   }
 }

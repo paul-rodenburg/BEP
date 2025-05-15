@@ -1,4 +1,6 @@
 import pandas as pd
+from matplotlib import pyplot as plt
+
 from classes.DBType import DBTypes, DBType
 from general_metrics import expand_excel
 import os
@@ -38,13 +40,14 @@ def get_db_storage_path(db_type: DBTypes, sqlite_path: str = None) -> str | None
 
     elif system == "Windows":
         if not is_running_as_admin():
-            raise PermissionError("Please run this script as an administrator to get storage space for Windows databases.")
+            pass
+            # raise PermissionError("Please run this script as an administrator to get storage space for Windows databases.")
         if db_type == DBTypes.MYSQL:
-            return r"C:\ProgramData\MySQL\MySQL Server 8.0\Data"
+            return r"C:\ProgramData\MySQL\MySQL Server 8.0\Data\reddit_data_20m"
         elif db_type == DBTypes.POSTGRESQL:
             return r"C:\Program Files\PostgreSQL\17\data"
         elif db_type == DBTypes.MONGODB:
-            return r"C:\Program Files\MongoDB\Server\8.0"
+            return r"C:\Program Files\MongoDB\Server\8.0\data"
 
     return None
 
@@ -86,13 +89,14 @@ def get_database_disk_usage(sqlite_path: str = None) -> dict[str, str]:
         path = get_db_storage_path(db_type, sqlite_path)
         if path:
             size_bytes = get_dir_size(path)
-            disk_usages[db_type.value] = format_size(size_bytes)
+            size_gbs = size_bytes / 1024 / 1024 / 1024
+            disk_usages[db_type.display_name] = size_gbs
         else:
-            disk_usages[db_type.value] = "Path not found"
+            disk_usages[db_type.display_name] = "Path not found"
 
     return disk_usages
 
-def create_dataframe_durations(sqlite_db_path: str) -> pd.DataFrame:
+def create_dataframe_disk_usage(sqlite_db_path: str) -> pd.DataFrame:
     """
     """
     disk_usage = get_database_disk_usage(sqlite_path=sqlite_db_path)
@@ -105,9 +109,28 @@ def create_dataframe_durations(sqlite_db_path: str) -> pd.DataFrame:
 
 
 if __name__ == '__main__':
-    sqlite_db_path = '../databases/reddit_data_ALL.db'
+    sqlite_db_path = '../databases/reddit_data_20m.db'
 
-    df = create_dataframe_durations(sqlite_db_path)
+    df = create_dataframe_disk_usage(sqlite_db_path)
     disk_usage_excel_path = 'disk_usage.xlsx'
     df.to_excel(disk_usage_excel_path, index=False)
     expand_excel(disk_usage_excel_path)
+
+    # Make plot
+    FONT_SIZE = 12
+    disk_usage_plot = df.plot.bar(x='database', y='size', color='blue')
+    disk_usage_plot.set_ylabel('Size (GB)', fontsize=FONT_SIZE)
+    disk_usage_plot.set_title('Storage Usage', fontweight='bold', fontsize=FONT_SIZE+5)
+    disk_usage_plot.set_xticklabels(df['database'], rotation=45, ha="right")
+    disk_usage_plot.tick_params(axis='x', labelsize=FONT_SIZE)
+    disk_usage_plot.tick_params(axis='y', labelsize=FONT_SIZE)
+    disk_usage_plot.legend().remove()
+    disk_usage_plot.set_xlabel('')
+
+    plt.tight_layout()
+
+    # Save the plot
+    os.makedirs('plots', exist_ok=True)
+    plt.savefig(f'plots/disk_usage.pdf')
+
+    plt.show()

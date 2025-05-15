@@ -55,7 +55,7 @@
     "queries": [
       {
         "name": "nested_top_commenters_on_top_post",
-        "query": "SELECT author_fullname FROM comment WHERE parent_id IN (SELECT name FROM post ORDER BY score DESC LIMIT 50)"
+        "query": "SELECT c.author_fullname FROM comment c JOIN (SELECT name FROM post ORDER BY score DESC LIMIT 50) top_posts ON c.parent_id = top_posts.name"
       },
       {
         "name": "nested_posts_by_most_active_author",
@@ -63,7 +63,7 @@
       },
       {
         "name": "nested_subreddits_with_high_avg_score",
-        "query": "SELECT DISTINCT subreddit_id FROM post WHERE subreddit_id IN (SELECT subreddit_id FROM post GROUP BY subreddit_id HAVING AVG(score) > 1000)"
+        "query": "SELECT DISTINCT p.subreddit_id FROM post p JOIN (SELECT subreddit_id FROM post GROUP BY subreddit_id HAVING AVG(score) > 1000 ORDER BY AVG(score) DESC LIMIT 100) high_avg ON p.subreddit_id = high_avg.subreddit_id"
       }
     ]
   }

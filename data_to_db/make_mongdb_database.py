@@ -4,7 +4,7 @@ from tqdm import tqdm
 from general import check_files, make_mongodb_client, update_summary_log
 from line_counts import get_line_count_file
 import os
-from data_to_sql import add_file_table_db_info, is_file_tables_added_db, get_primary_key, load_json, write_json
+from data_to_db.data_to_sql import add_file_table_db_info, is_file_tables_added_db, get_primary_key, load_json, write_json
 import sys
 from classes.logger import Logger
 import time
