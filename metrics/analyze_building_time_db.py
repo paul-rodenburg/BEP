@@ -42,8 +42,17 @@ def plot_building_time(df: pd.DataFrame, save_name=None):
         times = subset['time']
 
         # Create plot
-        fig, ax = plt.subplots(figsize=(6, 4))
-        ax.bar(db_types, times, color='blue')
+        fig, ax = plt.subplots(figsize=(6, 6))
+        bars = ax.bar(db_types, times, color='white', edgecolor='black', hatch='///')  # Save bars to add labels later
+
+        # Add value labels on top of bars
+        for bar in bars:
+            height = bar.get_height()
+            ax.annotate(f'{height:.2f}',  # Format to 2 decimal places
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom', fontsize=FONT_SIZE)
 
         # Title and labels
         ax.set_title(f'Time per DB for:\n{data_file}', fontsize=14, fontweight='bold')
@@ -51,6 +60,7 @@ def plot_building_time(df: pd.DataFrame, save_name=None):
         ax.set_xlabel('Database Type', fontsize=FONT_SIZE)
         ax.tick_params(axis='x', labelsize=FONT_SIZE)
         ax.tick_params(axis='y', labelsize=FONT_SIZE)
+        ax.grid(True, axis='y', linestyle='--', alpha=0.5)
 
         # Save plot with a filename-safe version of the data_file
         plt.tight_layout()

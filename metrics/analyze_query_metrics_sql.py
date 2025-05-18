@@ -72,13 +72,13 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
             width = 0.25
 
             fig, ax = plt.subplots(figsize=(16, 14))
-            bars1 = ax.bar(x - width, avg_sqlite, width, label='SQLite', color='red')
-            bars2 = ax.bar(x, avg_postgresql, width, label='PostgreSQL', color='blue')
-            bars3 = ax.bar(x + width, avg_mysql, width, label='MySQL', color='orange')
+            bars1 = ax.bar(x - width, avg_sqlite, width, label='SQLite', color='white', edgecolor='black', hatch='///')
+            bars2 = ax.bar(x, avg_postgresql, width, label='PostgreSQL', color='white', edgecolor='black', hatch='\\\\\\')
+            bars3 = ax.bar(x + width, avg_mysql, width, label='MySQL', color='white', edgecolor='black', hatch='xxx')
 
             # Check if the category is simple, if so then include MongoDB because MongoDB only has simple queries
             if cat == 'simple':
-                bars4 = ax.bar(x + width + width, avg_mongodb, width, label='MongoDB', color='yellow')
+                bars4 = ax.bar(x + width + width, avg_mongodb, width, label='MongoDB', color='white', edgecolor='black', hatch='++')
 
             ax.set_ylabel(y_label, fontsize=FONT_SIZE)
             ax.set_title(f'{title} – {cat.capitalize()} Queries', fontsize=FONT_SIZE, fontweight='bold')
@@ -88,6 +88,7 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
             ax.tick_params(axis='x', labelsize=FONT_SIZE)
             ax.tick_params(axis='y', labelsize=FONT_SIZE)
             ax.legend(fontsize=FONT_SIZE)
+            ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE)
 
 
             bars_list = [bars1, bars2, bars3]
@@ -98,7 +99,7 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
             for bars in bars_list:
                 for bar in bars:
                     height = bar.get_height()
-                    ax.annotate(f'{height:.1f}',
+                    ax.annotate(f'{int(height)}',
                                 xy=(bar.get_x() + bar.get_width() / 2, height),
                                 xytext=(0, 3),
                                 textcoords="offset points",
@@ -123,9 +124,9 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
         width = 0.25
 
         fig, ax = plt.subplots(figsize=(16, 14))
-        bars1 = ax.bar(x - width, avg_sqlite, width, label='SQLite', color='red')
-        bars2 = ax.bar(x, avg_postgresql, width, label='PostgreSQL', color='blue')
-        bars3 = ax.bar(x + width, avg_mysql, width, label='MySQL', color='orange')
+        bars1 = ax.bar(x - width, avg_sqlite, width, label='SQLite', color='white', edgecolor='black', hatch='///')
+        bars2 = ax.bar(x, avg_postgresql, width, label='PostgreSQL', color='white', edgecolor='black', hatch='\\\\\\')
+        bars3 = ax.bar(x + width, avg_mysql, width, label='MySQL', color='white', edgecolor='black', hatch='xxx')
 
         ax.set_ylabel(y_label, fontsize=FONT_SIZE)
         ax.set_title(title, fontsize=FONT_SIZE, fontweight='bold')
@@ -133,11 +134,12 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
         ax.set_xticklabels(queries, rotation=45, ha="right", fontsize=FONT_SIZE)
         ax.grid(True, axis='y', linestyle='--', alpha=0.5)
         ax.legend(fontsize=FONT_SIZE)
+        ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE)
 
         for bars in [bars1, bars2, bars3]:
             for bar in bars:
                 height = bar.get_height()
-                ax.annotate(f'{height:.1f}',
+                ax.annotate(f'{int(height)}',
                             xy=(bar.get_x() + bar.get_width() / 2, height),
                             xytext=(0, 3),
                             textcoords="offset points",

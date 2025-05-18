@@ -118,19 +118,29 @@ if __name__ == '__main__':
 
     # Make plot
     FONT_SIZE = 12
-    disk_usage_plot = df.plot.bar(x='database', y='size', color='blue')
-    disk_usage_plot.set_ylabel('Size (GB)', fontsize=FONT_SIZE)
-    disk_usage_plot.set_title('Storage Usage', fontweight='bold', fontsize=FONT_SIZE+5)
-    disk_usage_plot.set_xticklabels(df['database'], rotation=45, ha="right")
-    disk_usage_plot.tick_params(axis='x', labelsize=FONT_SIZE)
-    disk_usage_plot.tick_params(axis='y', labelsize=FONT_SIZE)
-    disk_usage_plot.legend().remove()
-    disk_usage_plot.set_xlabel('')
+    ax = df.plot.bar(x='database', y='size', color='white', edgecolor='black', hatch='///', figsize=(8, 7))
+    ax.set_ylabel('Size (GB)', fontsize=FONT_SIZE)
+    ax.set_title('Storage Usage', fontweight='bold', fontsize=FONT_SIZE + 5)
+    ax.set_xticklabels(df['database'], rotation=45, ha="right")
+    ax.tick_params(axis='x', labelsize=FONT_SIZE)
+    ax.tick_params(axis='y', labelsize=FONT_SIZE)
+    ax.legend().remove()
+    ax.set_xlabel('')
+    ax.grid(True, axis='y', linestyle='--', alpha=0.5)
+
+    # Add value labels on top of bars
+    for bar in ax.patches:
+        height = bar.get_height()
+        ax.annotate(f'{height:.2f}',
+                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                    xytext=(0, 3),  # Offset above the bar
+                    textcoords='offset points',
+                    ha='center', va='bottom', fontsize=FONT_SIZE)
 
     plt.tight_layout()
 
     # Save the plot
     os.makedirs('plots', exist_ok=True)
-    plt.savefig(f'plots/disk_usage.pdf')
+    plt.savefig('plots/disk_usage.pdf')
 
     plt.show()
