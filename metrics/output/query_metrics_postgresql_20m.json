@@ -159,7 +159,7 @@
       35958439
     ]
   },
-  "advanced_top_posts_by_score": {
+  "analytical_top_posts_by_score": {
     "times": [
       2.559,
       3.4818,
@@ -191,7 +191,7 @@
       10
     ]
   },
-  "advanced_average_comments_per_post": {
+  "analytical_average_comments_per_post": {
     "times": [
       2.1834,
       3.0138,
@@ -223,7 +223,7 @@
       1
     ]
   },
-  "advanced_active_subreddits_by_post_count": {
+  "analytical_active_subreddits_by_post_count": {
     "times": [
       4.2719,
       5.2875,

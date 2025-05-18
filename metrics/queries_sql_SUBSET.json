@@ -33,19 +33,19 @@
       }
     ]
   },
-  "advanced": {
-    "query_type": "advanced",
+  "analytical": {
+    "query_type": "analytical",
     "queries": [
       {
-        "name": "advanced_top_posts_by_score",
+        "name": "analytical_top_posts_by_score",
         "query": "SELECT title, score FROM post ORDER BY score DESC LIMIT 10"
       },
       {
-        "name": "advanced_average_comments_per_post",
+        "name": "analytical_average_comments_per_post",
         "query": "SELECT AVG(num_comments) AS avg_comments FROM post"
       },
       {
-        "name": "advanced_active_subreddits_by_post_count",
+        "name": "analytical_active_subreddits_by_post_count",
         "query": "SELECT subreddit_id, COUNT(*) AS post_count FROM post GROUP BY subreddit_id ORDER BY post_count DESC LIMIT 10"
       }
     ]

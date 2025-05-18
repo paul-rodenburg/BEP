@@ -89,47 +89,47 @@
       }
     ]
   },
-  "advanced": {
-    "query_type": "advanced",
+  "analytical": {
+    "query_type": "analytical",
     "queries": [
       {
-        "name": "advanced_top_posts_by_score",
+        "name": "analytical_top_posts_by_score",
         "query": "SELECT title, score FROM post ORDER BY score DESC LIMIT 10"
       },
       {
-        "name": "advanced_average_comments_per_post",
+        "name": "analytical_average_comments_per_post",
         "query": "SELECT AVG(num_comments) AS avg_comments FROM post"
       },
       {
-        "name": "advanced_active_subreddits_by_post_count",
+        "name": "analytical_active_subreddits_by_post_count",
         "query": "SELECT subreddit, COUNT(*) AS post_count FROM post GROUP BY subreddit ORDER BY post_count DESC LIMIT 10"
       },
       {
-        "name": "advanced_author_with_most_posts",
+        "name": "analytical_author_with_most_posts",
         "query": "SELECT author_fullname, COUNT(*) AS post_count FROM post GROUP BY author_fullname ORDER BY post_count DESC LIMIT 1"
       },
       {
-        "name": "advanced_most_awarded_posts",
+        "name": "analytical_most_awarded_posts",
         "query": "SELECT id, title, total_awards_received FROM post ORDER BY total_awards_received DESC LIMIT 10"
       },
       {
-        "name": "advanced_high_ratio_upvoted_posts",
+        "name": "analytical_high_ratio_upvoted_posts",
         "query": "SELECT id, title, upvote_ratio FROM post WHERE upvote_ratio > 0.95 ORDER BY upvote_ratio DESC"
       },
       {
-        "name": "advanced_subreddits_with_more_than_1M_subscribers",
+        "name": "analytical_subreddits_with_more_than_1M_subscribers",
         "query": "SELECT display_name, subscribers FROM subreddit WHERE subscribers > 1000000 ORDER BY subscribers DESC"
       },
       {
-        "name": "advanced_posts_with_video_and_images",
+        "name": "analytical_posts_with_video_and_images",
         "query": "SELECT id, title FROM post WHERE is_video = TRUE AND is_reddit_media_domain = TRUE"
       },
       {
-        "name": "advanced_comment_score_distribution",
+        "name": "analytical_comment_score_distribution",
         "query": "SELECT score, COUNT(*) AS count FROM comment GROUP BY score ORDER BY score DESC LIMIT 20"
       },
       {
-        "name": "advanced_commenter_activity",
+        "name": "analytical_commenter_activity",
         "query": "SELECT author_fullname, COUNT(*) AS num_comments FROM comment GROUP BY author_fullname ORDER BY num_comments DESC LIMIT 10"
       }
     ]
