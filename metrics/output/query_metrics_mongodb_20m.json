@@ -1,34 +1,43 @@
 {
   "simple_select_authors": {
     "times": [
-      591.2852
+      591.2852,
+      601.3432
     ],
     "memories": [
-      11143563.6758
+      11143563.6758,
+      11143570.6328
     ],
     "output_lengths": [
+      20000000,
       20000000
     ]
   },
   "simple_count_posts": {
     "times": [
-      306.1967
+      306.1967,
+      301.9599
     ],
     "memories": [
-      16.4932
+      16.4932,
+      16.501
     ],
     "output_lengths": [
+      1,
       1
     ]
   },
   "simple_unique_subreddits": {
     "times": [
-      330.6985
+      330.6985,
+      327.6728
     ],
     "memories": [
-      42080.7188
+      42080.7188,
+      42080.5938
     ],
     "output_lengths": [
+      489674,
       489674
     ]
   }

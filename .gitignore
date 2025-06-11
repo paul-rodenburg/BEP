@@ -13,3 +13,5 @@ error.csv
 */logs
 /logs
 error.xlsx
+metrics/output/*
+metrics/plots/*

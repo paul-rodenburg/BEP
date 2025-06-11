@@ -5,6 +5,7 @@ from classes.DBType import DBType, DBTypes
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import defaultdict
+from statistics import mean
 
 def check_outputs(db_types: list[DBType], query_metrics_file_base_name: str):
     """
@@ -47,8 +48,17 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
     db_mysql = load_json(db_mysql_path)
     db_mongodb = load_json(db_mongodb_path)
 
-    def get_avg_for_queries(queries, db):
-        return [np.mean(db[q][attribute]) for q in queries]
+    def get_avg_for_queries(queries, db, is_mongodb=False):
+        # Try to find the queries, if we are dealing with MongoDB the query execution could have been stopped
+        # for the reason that it took too long to execute. In that case query results will not be found,
+        # thus we discard this queries (the graphs will display that these queries took too long)
+        try:
+            means = [np.mean(db[q][attribute]) for q in queries]
+            return means
+        except:
+            if is_mongodb:
+                means = []
+                return means
 
     FONT_SIZE = 18
 
@@ -63,12 +73,21 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
             avg_sqlite = get_avg_for_queries(cat_queries, db_sqlite)
             avg_postgresql = get_avg_for_queries(cat_queries, db_postgresql)
             avg_mysql = get_avg_for_queries(cat_queries, db_mysql)
-
             # Check if the category is simple, if so then include MongoDB because MongoDB only has simple queries
-            if cat == 'simple':
-                avg_mongodb = get_avg_for_queries(cat_queries, db_mongodb)
+            avg_mongodb = get_avg_for_queries(cat_queries, db_mongodb, is_mongodb=True)
 
-            x = np.arange(len(cat_queries))
+            # By assumption: if average of MongoDB is 0 then that means that MongoDB took too long to query: we will display a high bar
+            mongodb_bad_performance = False # Set to True if the bar does not represent the performance, but 'too high to display'
+            if len(avg_mongodb) != len(cat_queries) or mean(avg_mongodb) <= 0:
+                avg_mongodb = []
+                for i in range(len(cat_queries)):
+                    avg_mongodb.append(max(avg_sqlite[i], avg_postgresql[i], avg_mysql[i]))
+                # max_avg = max(avg_sqlite + avg_postgresql + avg_mysql)  # Take max of the averages of the other databases to get an equally high bar
+                # avg_mongodb = [max_avg] * len(cat_queries)
+                mongodb_bad_performance = True
+
+            group_spacing = 1.1  # increase to make wider gaps between query groups
+            x = np.arange(len(cat_queries)) * group_spacing
             width = 0.25
 
             fig, ax = plt.subplots(figsize=(16, 14))
@@ -77,13 +96,12 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
             bars3 = ax.bar(x + width, avg_mysql, width, label='MySQL', color='white', edgecolor='black', hatch='xxx')
 
             # Check if the category is simple, if so then include MongoDB because MongoDB only has simple queries
-            if cat == 'simple':
-                bars4 = ax.bar(x + width + width, avg_mongodb, width, label='MongoDB', color='white', edgecolor='black', hatch='++')
+            bars4 = ax.bar(x + width + width, avg_mongodb, width, label='MongoDB', color='white', edgecolor='black', hatch='++')
 
             ax.set_ylabel(y_label, fontsize=FONT_SIZE)
             ax.set_title(f'{title} – {cat.capitalize()} Queries', fontsize=FONT_SIZE, fontweight='bold')
             ax.set_xticks(x)
-            ax.set_xticklabels(cat_queries, rotation=45, ha="right", fontsize=FONT_SIZE,)
+            ax.set_xticklabels(cat_queries, rotation=45, ha="right", fontsize=FONT_SIZE)
             ax.grid(True, axis='y', linestyle='--', alpha=0.5)
             ax.tick_params(axis='x', labelsize=FONT_SIZE)
             ax.tick_params(axis='y', labelsize=FONT_SIZE)
@@ -91,19 +109,23 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
             ax.yaxis.get_offset_text().set_fontsize(FONT_SIZE)
 
 
-            bars_list = [bars1, bars2, bars3]
-
-            if cat == 'simple':
-                bars_list.append(bars4)
+            bars_list = [bars1, bars2, bars3, bars4]
 
             for bars in bars_list:
                 for bar in bars:
                     height = bar.get_height()
-                    ax.annotate(f'{int(height)}',
-                                xy=(bar.get_x() + bar.get_width() / 2, height),
-                                xytext=(0, 3),
-                                textcoords="offset points",
-                                ha='center', va='bottom', fontsize=FONT_SIZE)
+                    if bars == bars4 and mongodb_bad_performance:  # We annotate the MongoDB bar with a text that will display that it took much longer than the other database
+                        ax.annotate(f'>{int(height)}',
+                                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                                    xytext=(0, 3),
+                                    textcoords="offset points",
+                                    ha='center', va='bottom', fontsize=FONT_SIZE, fontstyle='italic')
+                    else:
+                        ax.annotate(f'{int(height)}',
+                                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                                    xytext=(0, 3),
+                                    textcoords="offset points",
+                                    ha='center', va='bottom', fontsize=FONT_SIZE)
                     ax.legend(fontsize=FONT_SIZE)
 
             plt.tight_layout()
