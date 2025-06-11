@@ -64,9 +64,14 @@ if __name__ == "__main__":
     os.chdir(parent_directory)
 
     # Make db_type object
-    db_type = DBType(db_type=DBTypes.MONGODB, name_suffix="20m")
+    db_type = DBType(db_type=DBTypes.MONGODB, name_suffix="1m")
     query_metrics_file_base_name = 'metrics/output/query_metrics'
 
-    # Execute queries
-    queries = get_queries()
-    execute_queries(queries, db_type, query_metrics_file_base_name)
+    LOOP_TIMES = 10
+    count = 0
+    for _ in range(LOOP_TIMES):
+        count += 1
+        print(f'Loop {count}/{LOOP_TIMES}')
+        # Execute queries
+        queries = get_queries()
+        execute_queries(queries, db_type, query_metrics_file_base_name)
