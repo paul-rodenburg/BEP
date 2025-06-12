@@ -24,7 +24,7 @@ def get_building_time_df(db_types: list[DBType]) -> pd.DataFrame:
     df_build_times = pd.DataFrame(build_times)
     return df_build_times
 
-def plot_building_time(df: pd.DataFrame, save_name=None):
+def plot_building_time(df: pd.DataFrame, name_suffix, save_name=None):
     """
     Plots the building time for each database type for each datafile.
 
@@ -55,7 +55,7 @@ def plot_building_time(df: pd.DataFrame, save_name=None):
                         ha='center', va='bottom', fontsize=FONT_SIZE)
 
         # Title and labels
-        ax.set_title(f'Time per DB for:\n{data_file}', fontsize=14, fontweight='bold')
+        ax.set_title(f'Time per DB ({name_suffix}) for:\n{data_file}', fontsize=14, fontweight='bold')
         ax.set_ylabel('Time (s)', fontsize=FONT_SIZE)
         ax.set_xlabel('Database Type', fontsize=FONT_SIZE)
         ax.tick_params(axis='x', labelsize=FONT_SIZE)
@@ -70,10 +70,11 @@ def plot_building_time(df: pd.DataFrame, save_name=None):
 
 
 if __name__ == '__main__':
-    db_type_sqlite = DBType(DBTypes.SQLITE, name_suffix='20m')
-    db_type_mysql = DBType(DBTypes.MYSQL, name_suffix='20m')
-    db_type_postgresql = DBType(DBTypes.POSTGRESQL, name_suffix='20m')
-    db_type_mongodb = DBType(DBTypes.MONGODB, name_suffix='20m')
+    name_suffix = '1m'
+    db_type_sqlite = DBType(DBTypes.SQLITE, name_suffix=name_suffix)
+    db_type_mysql = DBType(DBTypes.MYSQL, name_suffix=name_suffix)
+    db_type_postgresql = DBType(DBTypes.POSTGRESQL, name_suffix=name_suffix)
+    db_type_mongodb = DBType(DBTypes.MONGODB, name_suffix=name_suffix)
 
     db_types = [db_type_sqlite,
                 db_type_mysql,
@@ -82,4 +83,4 @@ if __name__ == '__main__':
 
     df = get_building_time_df(db_types)
     print(df)
-    plot_building_time(df, save_name='building_time_by_db')
+    plot_building_time(df, name_suffix, save_name=f'building_time_by_db_{name_suffix}')

@@ -519,8 +519,9 @@ def set_index(engine: Engine, table_name: str, db_type: DBType):
                         drop_index_query = text(f"DROP INDEX index_{pm} ON {table_name}")
                         conn.execute(drop_index_query)
                     except Exception as e:
-                        print(f"[{db_type.display_name}] Error removing index index_{pm} on {table_name}: {e}")
-                        print('Will just set the index now...')
+                        pass
+                        # print(f"[{db_type.display_name}] Error removing index index_{pm} on {table_name}: {e}")
+                        # print('Will just set the index now...')
 
                 # Check if the column is of type TEXT or BLOB
                 column_type_query = text(f"""

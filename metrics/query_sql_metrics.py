@@ -153,10 +153,13 @@ if __name__ == '__main__':
     query_metrics_file_base_name = 'metrics/output/query_metrics'
     queries_sql_json = load_json('metrics/queries_sql_SUBSET.json')
 
-    db_types = [DBType(db_type=DBTypes.SQLITE, name_suffix='20m'), DBType(db_type=DBTypes.POSTGRESQL, name_suffix='20m')]
-    random.shuffle(db_types)  # Randomize the order of db_types to remove any advantages of the order
-    db_types.append(DBType(db_type=DBTypes.MYSQL, name_suffix='20m'))
-    print_order(db_types)
+    for i in range(10):
+        print(f'Loop {i+1} of 10...')
+        name_suffix = '1m'
+        db_types = [DBType(db_type=DBTypes.SQLITE, name_suffix=name_suffix), DBType(db_type=DBTypes.POSTGRESQL, name_suffix=name_suffix)]
+        random.shuffle(db_types)  # Randomize the order of db_types to remove any advantages of the order
+        db_types.append(DBType(db_type=DBTypes.MYSQL, name_suffix=name_suffix))
+        print_order(db_types)
 
-    execute_queries(queries_sql_json, db_types)
+        execute_queries(queries_sql_json, db_types)
 

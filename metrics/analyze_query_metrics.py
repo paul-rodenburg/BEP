@@ -177,10 +177,11 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
             print(f'Plot saved to plots/{save_name}.pdf!')
 
 if __name__ == '__main__':
-    db_type_sqlite = DBType(DBTypes.SQLITE, name_suffix='20m')
-    db_type_mysql = DBType(DBTypes.MYSQL, name_suffix='20m')
-    db_type_postgresql = DBType(DBTypes.POSTGRESQL, name_suffix='20m')
-    db_type_mongodb = DBType(DBTypes.MONGODB, name_suffix='20m')
+    name_suffix = '1m'
+    db_type_sqlite = DBType(DBTypes.SQLITE, name_suffix=name_suffix)
+    db_type_mysql = DBType(DBTypes.MYSQL, name_suffix=name_suffix)
+    db_type_postgresql = DBType(DBTypes.POSTGRESQL, name_suffix=name_suffix)
+    db_type_mongodb = DBType(DBTypes.MONGODB, name_suffix=name_suffix)
 
 
     # Dont include mongodb for the checks because it does not have all queries
@@ -195,10 +196,10 @@ if __name__ == '__main__':
     # Plot by time
     plot_times(db_type_sqlite=db_type_sqlite, db_type_mysql=db_type_mysql, db_type_postgresql=db_type_postgresql,
                db_type_mongodb=db_type_mongodb, attribute='times', title='Average Execution Time per Query by Database (Lower is better)',
-               y_label='Average Execution Time (s)', save_name='avg_execution_time_per_query_by_db', split_categories=True)
+               y_label='Average Execution Time (s)', save_name=f'avg_execution_time_per_query_by_db_{name_suffix}', split_categories=True)
 
     # Plot by memory
     plot_times(db_type_sqlite=db_type_sqlite, db_type_mysql=db_type_mysql, db_type_postgresql=db_type_postgresql,
                db_type_mongodb=db_type_mongodb, attribute='memories', title='Average Memory Usage per Query by Database (Lower is better)',
-               y_label='Average Memory Usage (KB)', save_name='avg_memory_usage_per_query_by_db', split_categories=True)
+               y_label='Average Memory Usage (KB)', save_name=f'avg_memory_usage_per_query_by_db_{name_suffix}', split_categories=True)
 
