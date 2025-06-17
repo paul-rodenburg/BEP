@@ -11,7 +11,7 @@ def get_building_time_df(db_types: list[DBType]) -> pd.DataFrame:
 
     :param db_types: The database types to include in the dataframe.
 
-    :return: Dataframe consists the building time for each database type for each datafile.
+    :return: Dataframe consisting the building time for each database type for each datafile.
     """
     base_path_build_times = '../logs/summaries/summary'
     build_times = []
@@ -55,14 +55,14 @@ def plot_building_time(df: pd.DataFrame, name_suffix, save_name=None):
                         ha='center', va='bottom', fontsize=FONT_SIZE)
 
         # Title and labels
-        ax.set_title(f'Time per DB ({name_suffix}) for:\n{data_file}', fontsize=14, fontweight='bold')
+        ax.set_title(f'Import Time of Dataset ({name_suffix}):\n{data_file}', fontsize=14, fontweight='bold')
         ax.set_ylabel('Time (s)', fontsize=FONT_SIZE)
         ax.set_xlabel('Database Type', fontsize=FONT_SIZE)
         ax.tick_params(axis='x', labelsize=FONT_SIZE)
         ax.tick_params(axis='y', labelsize=FONT_SIZE)
         ax.grid(True, axis='y', linestyle='--', alpha=0.5)
 
-        # Save plot with a filename-safe version of the data_file
+        # Save plot
         plt.tight_layout()
         if save_name:
             fig.savefig(f'plots/{save_name}_{data_file}.pdf')
@@ -70,7 +70,7 @@ def plot_building_time(df: pd.DataFrame, name_suffix, save_name=None):
 
 
 if __name__ == '__main__':
-    name_suffix = '1m'
+    name_suffix = '20m'
     db_type_sqlite = DBType(DBTypes.SQLITE, name_suffix=name_suffix)
     db_type_mysql = DBType(DBTypes.MYSQL, name_suffix=name_suffix)
     db_type_postgresql = DBType(DBTypes.POSTGRESQL, name_suffix=name_suffix)
@@ -83,4 +83,4 @@ if __name__ == '__main__':
 
     df = get_building_time_df(db_types)
     print(df)
-    plot_building_time(df, name_suffix, save_name=f'building_time_by_db_{name_suffix}')
+    plot_building_time(df, name_suffix, save_name=f'import_time_by_db_{name_suffix}')

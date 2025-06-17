@@ -5,7 +5,7 @@ from typing import Tuple
 from pymongo import MongoClient
 from tqdm import tqdm
 from general_metrics import update_query_metrics, get_total_queries_number
-from queries_mongodb_simple import get_queries
+from queries_mongodb import get_queries
 from collections.abc import Sized
 from classes.DBType import DBTypes, DBType
 
@@ -74,4 +74,7 @@ if __name__ == "__main__":
         print(f'Loop {count}/{LOOP_TIMES}')
         # Execute queries
         queries = get_queries()
+        # Only get analytical queries to test. Comment the following line if you want to test all queries
+        queries = {'analytical': queries['analytical']}
+
         execute_queries(queries, db_type, query_metrics_file_base_name)

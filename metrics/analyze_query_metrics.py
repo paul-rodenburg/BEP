@@ -35,7 +35,7 @@ def check_outputs(db_types: list[DBType], query_metrics_file_base_name: str):
             if not set(data[i][k]['output_lengths']) == set(data[next_i][k]['output_lengths']):
                 print(f"The values of output for {k} for {db_types[i].display_name} and {db_types[next_i].display_name} are not equal:\n{db_types[i].display_name}: {set(data[i][k]['output_lengths'])}\n{db_types[next_i].display_name}: {set(data[next_i][k]['output_lengths'])}")
 
-def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql: DBType, db_type_mongodb: DBType,
+def plot_metrics(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql: DBType, db_type_mongodb: DBType,
                attribute: str, title: str, y_label: str, save_name=None, split_categories=False):
     # Define paths to the metrics files for each DB type
     db_sqlite_path = f'{query_metrics_file_base_name}_{db_type_sqlite.get_type().display_name.lower()}_{db_type_sqlite.name_suffix}.json'
@@ -49,11 +49,15 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
     db_mongodb = load_json(db_mongodb_path)
 
     def get_avg_for_queries(queries, db, is_mongodb=False):
+        divide_number = 1
+        if attribute == 'memories':  # Check if we are dealing with memory, if so make is MB instead of KB (better for plots)
+            divide_number = 1024
+
         # Try to find the queries, if we are dealing with MongoDB the query execution could have been stopped
         # for the reason that it took too long to execute. In that case query results will not be found,
         # thus we discard this queries (the graphs will display that these queries took too long)
         try:
-            means = [np.mean(db[q][attribute]) for q in queries]
+            means = [np.mean(db[q][attribute]) / divide_number for q in queries]
             return means
         except:
             if is_mongodb:
@@ -115,13 +119,13 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
                 for bar in bars:
                     height = bar.get_height()
                     if bars == bars4 and mongodb_bad_performance:  # We annotate the MongoDB bar with a text that will display that it took much longer than the other database
-                        ax.annotate(f'>{int(height)}',
+                        ax.annotate(f'>{height:.1f}',
                                     xy=(bar.get_x() + bar.get_width() / 2, height),
                                     xytext=(0, 3),
                                     textcoords="offset points",
                                     ha='center', va='bottom', fontsize=FONT_SIZE, fontstyle='italic')
                     else:
-                        ax.annotate(f'{int(height)}',
+                        ax.annotate(f'{height:.1f}',
                                     xy=(bar.get_x() + bar.get_width() / 2, height),
                                     xytext=(0, 3),
                                     textcoords="offset points",
@@ -161,7 +165,7 @@ def plot_times(db_type_sqlite: DBType, db_type_mysql: DBType, db_type_postgresql
         for bars in [bars1, bars2, bars3]:
             for bar in bars:
                 height = bar.get_height()
-                ax.annotate(f'{int(height)}',
+                ax.annotate(f'{height:.1f}',
                             xy=(bar.get_x() + bar.get_width() / 2, height),
                             xytext=(0, 3),
                             textcoords="offset points",
@@ -193,13 +197,17 @@ if __name__ == '__main__':
 
     check_outputs(db_types, query_metrics_file_base_name)
 
-    # Plot by time
-    plot_times(db_type_sqlite=db_type_sqlite, db_type_mysql=db_type_mysql, db_type_postgresql=db_type_postgresql,
-               db_type_mongodb=db_type_mongodb, attribute='times', title='Average Execution Time per Query by Database (Lower is better)',
-               y_label='Average Execution Time (s)', save_name=f'avg_execution_time_per_query_by_db_{name_suffix}', split_categories=True)
+    # Plot query execution times
+    plot_metrics(db_type_sqlite=db_type_sqlite, db_type_mysql=db_type_mysql, db_type_postgresql=db_type_postgresql,
+                 db_type_mongodb=db_type_mongodb, attribute='times',
+                 title=f'Average Execution Time per Query by Database (Lower is better) ({name_suffix})',
+                 y_label='Average Execution Time (s)', save_name=f'avg_execution_time_per_query_by_db_{name_suffix}',
+                 split_categories=True)
 
-    # Plot by memory
-    plot_times(db_type_sqlite=db_type_sqlite, db_type_mysql=db_type_mysql, db_type_postgresql=db_type_postgresql,
-               db_type_mongodb=db_type_mongodb, attribute='memories', title='Average Memory Usage per Query by Database (Lower is better)',
-               y_label='Average Memory Usage (KB)', save_name=f'avg_memory_usage_per_query_by_db_{name_suffix}', split_categories=True)
+    # Plot query memory usage
+    plot_metrics(db_type_sqlite=db_type_sqlite, db_type_mysql=db_type_mysql, db_type_postgresql=db_type_postgresql,
+                 db_type_mongodb=db_type_mongodb, attribute='memories',
+                 title=f'Average Memory Usage per Query by Database (Lower is better) ({name_suffix})',
+                 y_label='Average Memory Usage (MB)', save_name=f'avg_memory_usage_per_query_by_db_{name_suffix}',
+                 split_categories=True)
 

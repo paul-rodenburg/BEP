@@ -97,20 +97,21 @@ def get_queries():
                 }
                 ]
         },
-        "advanced": {
-            "query_type": "advanced",
+        "analytical": {
+            "query_type": "analytical",
             "queries": [
                 {
-                    "name": "advanced_top_posts_by_score",
-                    "query": lambda db: list(db["post"].aggregate([
+                    "name": "analytical_top_posts_by_score",
+                    "query": lambda col: list(col.aggregate([
                         {"$sort": {"score": -1}},
                         {"$limit": 10},
                         {"$project": {"_id": 0, "title": 1, "score": 1}}
-                    ]))
+                    ])),
+                    "collection": "post"
                 },
                 {
-                    "name": "advanced_average_comments_per_post",
-                    "query": lambda db: list(db["post"].aggregate([
+                    "name": "analytical_average_comments_per_post",
+                    "query": lambda col: list(col.aggregate([
                         {
                             "$group": {
                                 "_id": None,
@@ -118,11 +119,12 @@ def get_queries():
                             }
                         },
                         {"$project": {"_id": 0, "avg_comments": 1}}
-                    ]))
+                    ])),
+                    "collection": "post"
                 },
                 {
-                    "name": "advanced_active_subreddits_by_post_count",
-                    "query": lambda db: list(db["post"].aggregate([
+                    "name": "analytical_active_subreddits_by_post_count",
+                    "query": lambda col: list(col.aggregate([
                         {
                             "$group": {
                                 "_id": "$subreddit_id",
@@ -138,7 +140,8 @@ def get_queries():
                                 "post_count": 1
                             }
                         }
-                    ]))
+                    ])),
+                    "collection": "post"
                 }
             ]
         },

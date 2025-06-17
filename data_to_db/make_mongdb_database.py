@@ -25,7 +25,7 @@ check_files()
 pbar = None
 
 # Make db_type object for MongoDB database
-db_type = DBType(DBTypes.MONGODB, name_suffix='1m', max_rows=1_000_000)
+db_type = DBType(DBTypes.MONGODB, name_suffix='20m', max_rows=20_000_000)
 
 # Set up the logger
 os.makedirs("logs/summaries", exist_ok=True)

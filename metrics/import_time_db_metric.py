@@ -63,6 +63,6 @@ def create_dataframe_durations() -> pd.DataFrame:
 
 if __name__ == '__main__':
     df = create_dataframe_durations()
-    creation_time_excel_path = 'creation_time.xlsx'
+    creation_time_excel_path = 'import_time.xlsx'
     df.to_excel(creation_time_excel_path, index=False)
     expand_excel(creation_time_excel_path)

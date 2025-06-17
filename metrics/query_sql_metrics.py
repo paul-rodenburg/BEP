@@ -151,7 +151,7 @@ if __name__ == '__main__':
 
     os.makedirs('metrics/output', exist_ok=True)
     query_metrics_file_base_name = 'metrics/output/query_metrics'
-    queries_sql_json = load_json('metrics/queries_sql_SUBSET.json')
+    queries_sql_json = load_json('metrics/queries_sql.json')
 
     for i in range(10):
         print(f'Loop {i+1} of 10...')
